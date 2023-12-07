@@ -36,19 +36,25 @@ class PsmEnv(SurRoLGoalEnv):
     ACTION_MODE = 'yaw'
     DISTANCE_THRESHOLD = 0.005
     POSE_PSM1 = ((0.05, 0.24, 0.8524), (0, 0, -(90 + 20) / 180 * np.pi))
+    # POSE_PSM1 = ((0.96, 0.1, 0.38), ((90 - 25) / 180 * np.pi, 0, 1/2 * np.pi))
+
     QPOS_PSM1 = (0, 0, 0.10, 0, 0, 0)
     POSE_TABLE = ((0.5, 0, 0.001), (0, 0, 0))
+    # original limits
     WORKSPACE_LIMITS1 = ((0.50, 0.60), (-0.05, 0.05), (0.675, 0.745))
+    #modified limits for peg_board
+    # WORKSPACE_LIMITS1 = ((0.50, 0.60), (-0.05, 0.05), (0.675, 0.785))
     SCALING = 1.
 
     def __init__(self,
-                 render_mode=None):
+                 render_mode=None, cid = -1):
         # workspace
         workspace_limits = np.asarray(self.WORKSPACE_LIMITS1) \
                            + np.array([0., 0., 0.0102]).reshape((3, 1))  # tip-eef offset with collision margin
         workspace_limits *= self.SCALING  # use scaling for more stable collistion simulation
         self.workspace_limits1 = workspace_limits
-
+        # plot goal
+        self._goal_plot = True
         # has_object
         self.has_object = False
         self._waypoint_goal = False
@@ -57,8 +63,8 @@ class PsmEnv(SurRoLGoalEnv):
         # gripper
         self.block_gripper = True
         self._activated = -1
-
-        super(PsmEnv, self).__init__(render_mode)
+        self._max_constraint_id = 1
+        super(PsmEnv, self).__init__(render_mode, cid)
 
         # distance_threshold
         self.distance_threshold = self.DISTANCE_THRESHOLD * self.SCALING
@@ -89,10 +95,7 @@ class PsmEnv(SurRoLGoalEnv):
         # return - (d > self.distance_threshold).astype(np.float32)
         return self._is_success(achieved_goal, desired_goal).astype(np.float32) - 1.
 
-    def _env_setup(self):
-        # for venv
-        self.obj_ids = {'fixed': [], 'rigid': [], 'deformable': []}
-
+    def _env_setup(self,goal_plot=True):
         # camera
         if self._render_mode == 'human':
             reset_camera(yaw=90.0, pitch=-30.0, dist=0.82 * self.SCALING,
@@ -119,10 +122,15 @@ class PsmEnv(SurRoLGoalEnv):
                    globalScaling=self.SCALING)
 
         # for goal plotting
-        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'sphere/sphere.urdf'),
-                            globalScaling=self.SCALING)
-        self.obj_ids['fixed'].append(obj_id)  # 0
-
+        if goal_plot:
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'sphere/sphere.urdf'),
+                                globalScaling=self.SCALING)
+            self.obj_ids['fixed'].append(obj_id)  # 0
+        else: 
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'sphere/sphere.urdf'),
+                                globalScaling=0.000001) #visually remove
+            self.obj_ids['fixed'].append(obj_id)  # 0    
+        # print(f'goal:{obj_id}')
         pass  # need to implement based on every task
         # self.obj_ids
 
@@ -183,6 +191,9 @@ class PsmEnv(SurRoLGoalEnv):
         delta_position (3), delta_theta (1) and open/close the gripper (1)
         in the world frame
         """
+        # print(f'gripper contact info:{p.getContactPoints(bodyA=self.psm1.body, linkIndexA=6)}')
+        # if p.getNumConstraints():
+        #     print(f'num of constraints for set action: {p.getNumConstraints()}')
         assert len(action) == self.ACTION_SIZE, "The action should have the save dim with the ACTION_SIZE"
         # time0 = time.time()
         action = action.copy()  # ensure that we don't change the action outside of this scope
@@ -194,7 +205,7 @@ class PsmEnv(SurRoLGoalEnv):
                                     workspace_limits[:, 1] + [0.02, 0.02, 0.08])  # clip to ensure convergence
         rot = get_euler_from_matrix(pose_world[:3, :3])
         if self.ACTION_MODE == 'yaw':
-            action[3] *= np.deg2rad(30)  # yaw, limit maximum change in rotation
+            action[3] *= np.deg2rad(20)  # yaw, limit maximum change in rotation
             rot = (self.psm1_eul[0], self.psm1_eul[1], wrap_angle(rot[2] + action[3]))  # only change yaw
         elif self.ACTION_MODE == 'pitch':
             action[3] *= np.deg2rad(15)  # pitch, limit maximum change in rotation
@@ -217,6 +228,7 @@ class PsmEnv(SurRoLGoalEnv):
         else:
             self.psm1.move_jaw(np.deg2rad(40))  # open jaw angle; can tune
             self._release(0)
+
         # time3 = time.time()
         # print("transform time: {:.4f}, IK time: {:.4f}, jaw time: {:.4f}, total time: {:.4f}"
         #       .format(time1 - time0, time2 - time1, time3 - time2, time3 - time0))
@@ -232,48 +244,76 @@ class PsmEnv(SurRoLGoalEnv):
         d = goal_distance(achieved_goal, desired_goal)
         return (d < self.distance_threshold).astype(np.float32)
 
-    def _step_callback(self):
+    def _step_callback(self,demo=1):
         """ Remove the contact constraint if no contacts
         """
         if self.block_gripper or not self.has_object or self._activated < 0:
+            # print(f'skip{self.block_gripper} {self.has_object} {self._activated}')
             return
-        elif self._contact_constraint is None:
+        # if demo:
+        if self._contact_constraint is None:
             # the grippers activate; to check if they can grasp the object
             # TODO: check whether the constraint may cause side effects
+            # pass
             psm = self.psm1 if self._activated == 0 else self.psm2
+            # print(self._meet_contact_constraint_requirement())
             if self._meet_contact_constraint_requirement():
-                body_pose = p.getLinkState(psm.body, psm.EEF_LINK_INDEX)
-                obj_pose = p.getBasePositionAndOrientation(self.obj_id)
-                world_to_body = p.invertTransform(body_pose[0], body_pose[1])
-                obj_to_body = p.multiplyTransforms(world_to_body[0],
-                                                   world_to_body[1],
-                                                   obj_pose[0], obj_pose[1])
+                # print(self.obj_id)
+                points_1 = p.getContactPoints(bodyA=psm.body, linkIndexA=6)
+                points_2 = p.getContactPoints(bodyA=psm.body, linkIndexA=7)
+                points_1 = [point[2] for point in points_1 if point[2] in self.obj_ids['rigid']]
+                points_2 = [point[2] for point in points_2 if point[2] in self.obj_ids['rigid']]
+                contact_List = list(set(points_1)&set(points_2))
+                # print(f'contact{contact_List}')
+                # print(f'contact item id:{contact_List}')
+                if len(contact_List)>0:
+                    contact_Id=contact_List[-1]
+                    body_pose = p.getLinkState(psm.body, psm.EEF_LINK_INDEX)
+                    obj_pose = p.getBasePositionAndOrientation(contact_Id)
+                    world_to_body = p.invertTransform(body_pose[0], body_pose[1])
+                    obj_to_body = p.multiplyTransforms(world_to_body[0],
+                                                    world_to_body[1],
+                                                    obj_pose[0], obj_pose[1])                
 
-                self._contact_constraint = p.createConstraint(
-                    parentBodyUniqueId=psm.body,
-                    parentLinkIndex=psm.EEF_LINK_INDEX,
-                    childBodyUniqueId=self.obj_id,
-                    childLinkIndex=-1,
-                    jointType=p.JOINT_FIXED,
-                    jointAxis=(0, 0, 0),
-                    parentFramePosition=obj_to_body[0],
-                    parentFrameOrientation=obj_to_body[1],
-                    childFramePosition=(0, 0, 0),
-                    childFrameOrientation=(0, 0, 0))
-                # TODO: check the maxForce; very subtle
-                p.changeConstraint(self._contact_constraint, maxForce=20)
+                    self._contact_constraint = p.createConstraint(
+                        parentBodyUniqueId=psm.body,
+                        parentLinkIndex=psm.EEF_LINK_INDEX,
+                        childBodyUniqueId=contact_Id,
+                        childLinkIndex=-1,
+                        jointType=p.JOINT_FIXED,
+                        jointAxis=(0, 0, 0),
+                        parentFramePosition=obj_to_body[0],
+                        parentFrameOrientation=obj_to_body[1],
+                        childFramePosition=(0, 0, 0),
+                        childFrameOrientation=(0, 0, 0))
+                    # TODO: check the maxForce; very subtle
+                    # print(f'contact with {contact_Id}!create constraint id{self._contact_constraint}!')
+                    p.changeConstraint(self._contact_constraint, maxForce=20)
         else:
             # self._contact_constraint is not None
             # the gripper grasp the object; to check if they remain contact
+            # pass
             psm = self.psm1 if self._activated == 0 else self.psm2
-            points = p.getContactPoints(bodyA=psm.body, linkIndexA=6) \
-                     + p.getContactPoints(bodyA=psm.body, linkIndexA=7)
-            points = [points for point in points if point[2] == self.obj_id]
-            remain_contact = len(points) > 0
+            # points = p.getContactPoints(bodyA=psm.body, linkIndexA=6) \
+            #          + p.getContactPoints(bodyA=psm.body, linkIndexA=7)
+            points_1 = p.getContactPoints(bodyA=psm.body, linkIndexA=6)
+            points_2 = p.getContactPoints(bodyA=psm.body, linkIndexA=7)
+            points_1 = [point[2] for point in points_1 if point[2] in self.obj_ids['rigid']]
+            points_2 = [point[2] for point in points_2 if point[2] in self.obj_ids['rigid']]
+            intersect = list(set(points_1)&set(points_2))
+            # if len(intersect) > 0:
+            #     contact_Id = intersect[-1]
+            # else:
+            #     contact_Id = -100
+            # points = [point for point in points if point[2] == contact_Id]
+            # remain_contact = len(points) > 0
+            remain_contact = len(intersect) > 0
 
             if not remain_contact and not self._contact_approx:
                 # release the previously grasped object because there is no contact any more
+                # print("no contact!remove constraint!")
                 self._release(self._activated)
+        # print(f'num of constraints for stepcallback: {p.getNumConstraints()}')
 
     def _sample_goal(self) -> np.ndarray:
         """ Samples a new goal and returns it.
@@ -312,33 +352,47 @@ class PsmEnv(SurRoLGoalEnv):
                     p.setCollisionFilterPair(bodyUniqueIdA=psm.body, bodyUniqueIdB=self.obj_id,
                                              linkIndexA=7, linkIndexB=-1, enableCollision=0)
             else:
-                # activate if a physical contact happens
+                # activate if a physical contact happens between grippers and object items
                 points_1 = p.getContactPoints(bodyA=psm.body, linkIndexA=6)
                 points_2 = p.getContactPoints(bodyA=psm.body, linkIndexA=7)
-                points_1 = [point for point in points_1 if point[2] == self.obj_id]
-                points_2 = [point for point in points_2 if point[2] == self.obj_id]
-                if len(points_1) > 0 and len(points_2) > 0:
+                points_1 = [point[2] for point in points_1 if point[2] in self.obj_ids['rigid']]
+                points_2 = [point[2] for point in points_2 if point[2] in self.obj_ids['rigid']]
+                intersect = list(set(points_1)&set(points_2))
+                # print(f'left gripper: {points_1}')
+                # print(f'right gripper: {points_2}')
+                if len(intersect)>0:
                     self._activated = idx
 
-    def _release(self, idx: int):
+    def _release(self, idx: int,demo=1):
         # release the object
         if self.block_gripper:
             return
 
         if self._activated == idx:
             self._activated = -1
-
             if self._contact_constraint is not None:
                 try:
-                    p.removeConstraint(self._contact_constraint)
-                    self._contact_constraint = None
+                    # print(f"no contact!to remove constraint id{self._contact_constraint}!")
+                    for i in range(1,self._contact_constraint+1):
+                        p.changeConstraint(i, maxForce=0)
+                        p.removeConstraint(i)
+                    if not p.getNumConstraints():
+                        self._contact_constraint = None
+                        # print(f"constraint status: {p.getConstraintInfo(i)}")
+                        # print(f"constraint state:{p.getConstraintState(i)}")
+                    # p.changeConstraint(self._contact_constraint, maxForce=0)
+                    # self._contact_constraint = None
+                    # print(f"#(constraint)?{p.getNumConstraints()}!")
+
+
                     # enable collision
-                    psm = self.psm1 if idx == 0 else self.psm2
-                    p.setCollisionFilterPair(bodyUniqueIdA=psm.body, bodyUniqueIdB=self.obj_id,
-                                             linkIndexA=6, linkIndexB=-1, enableCollision=1)
-                    p.setCollisionFilterPair(bodyUniqueIdA=psm.body, bodyUniqueIdB=self.obj_id,
-                                             linkIndexA=7, linkIndexB=-1, enableCollision=1)
+                    # psm = self.psm1 if idx == 0 else self.psm2
+                    # p.setCollisionFilterPair(bodyUniqueIdA=psm.body, bodyUniqueIdB=self.obj_id,
+                    #                          linkIndexA=6, linkIndexB=-1, enableCollision=1)
+                    # p.setCollisionFilterPair(bodyUniqueIdA=psm.body, bodyUniqueIdB=self.obj_id,
+                    #                          linkIndexA=7, linkIndexB=-1, enableCollision=1)
                 except:
+                    # print("unable to get constraint info since removed")
                     pass
 
     def _meet_contact_constraint_requirement(self) -> bool:
@@ -375,14 +429,14 @@ class PsmsEnv(PsmEnv):
     SCALING = 1.
 
     def __init__(self,
-                 render_mode=None):
+                 render_mode=None, cid = -1):
         # workspace
         workspace_limits = np.asarray(self.WORKSPACE_LIMITS2) \
                            + np.array([0., 0., 0.0102]).reshape((3, 1))  # tip-eef offset with collision margin
         workspace_limits *= self.SCALING
         self.workspace_limits2 = workspace_limits
 
-        super(PsmsEnv, self).__init__(render_mode)
+        super(PsmsEnv, self).__init__(render_mode, cid)
 
     def _env_setup(self):
         super(PsmsEnv, self)._env_setup()
@@ -466,7 +520,7 @@ class PsmsEnv(PsmEnv):
             rot = get_euler_from_matrix(pose_world[:3, :3])
             psm_eul = self.psm1_eul if i == 0 else self.psm2_eul
             if self.ACTION_MODE == 'yaw':
-                action[idx + 3] *= np.deg2rad(30)  # limit maximum change in rotation
+                action[idx + 3] *= np.deg2rad(20)  # limit maximum change in rotation
                 rot = (psm_eul[0], psm_eul[1], wrap_angle(rot[2] + action[idx + 3]))  # only change yaw
             elif self.ACTION_MODE == 'pitch':
                 action[idx + 3] *= np.deg2rad(15)  # limit maximum change in rotation

@@ -1,4 +1,4 @@
-import time
+import time,os
 import socket
 
 import gym
@@ -13,6 +13,8 @@ from surrol.utils.pybullet_utils import (
     render_image,
 )
 import numpy as np
+from surrol.const import ROOT_DIR_PATH, ASSET_DIR_PATH
+
 
 RENDER_HEIGHT = 480  # train
 RENDER_WIDTH = 640
@@ -28,7 +30,7 @@ class SurRoLEnv(gym.Env):
 
     metadata = {'render.modes': ['human', 'rgb_array', 'img_array']}
 
-    def __init__(self, render_mode: str = None):
+    def __init__(self, render_mode: str = None, cid: int = -1):
         # rendering and connection options
         self._render_mode = render_mode
         # render_mode = 'human'
@@ -36,10 +38,16 @@ class SurRoLEnv(gym.Env):
         #     self.cid = p.connect(p.SHARED_MEMORY)
         #     if self.cid < 0:
         if render_mode == 'human':
-            self.cid = p.connect(p.GUI)
+            if cid < 0:
+                self.cid = p.connect(p.GUI)
+            else:
+                self.cid = cid
             # p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
         else:
-            self.cid = p.connect(p.DIRECT)
+            if cid < 0:
+                self.cid = p.connect(p.DIRECT)
+            else:
+                self.cid = cid
             # See PyBullet Quickstart Guide Synthetic Camera Rendering
             # TODO: no light when using direct without egl
             if socket.gethostname().startswith('pc') or True:
@@ -61,7 +69,10 @@ class SurRoLEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.configureDebugVisualizer(lightPosition=(10.0, 0.0, 10.0))
         p.setGravity(0, 0, -9.81)
-        p.loadURDF("plane.urdf", (0, 0, -0.001))
+        plane=p.loadURDF(os.path.join(ASSET_DIR_PATH, "plane/plane.urdf"), (0, 0, -0.001))
+        wood = p.loadTexture(os.path.join(ASSET_DIR_PATH, "texture/wood.jpg"))
+        p.changeVisualShape(plane, -1, textureUniqueId=wood)
+
         self.obj_ids = {'fixed': [], 'rigid': [], 'deformable': []}
 
         self.seed()
@@ -86,6 +97,7 @@ class SurRoLEnv(gym.Env):
         else:
             raise NotImplementedError
 
+        # @taohuang
         self._duration = 0.2  # important for mini-steps
 
     def step(self, action: np.ndarray):
@@ -126,7 +138,9 @@ class SurRoLEnv(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         # p.configureDebugVisualizer(p.COV_ENABLE_PLANAR_REFLECTION, 0)
 
-        p.loadURDF("plane.urdf", (0, 0, -0.001))
+        plane=p.loadURDF(os.path.join(ASSET_DIR_PATH, "plane/plane.urdf"), (0, 0, -0.001))
+        wood = p.loadTexture(os.path.join(ASSET_DIR_PATH, "texture/wood.jpg"))
+        p.changeVisualShape(plane, -1, textureUniqueId=wood)
         self._env_setup()
         step(0.25)
         self.goal = self._sample_goal().copy()
@@ -210,13 +224,15 @@ class SurRoLEnv(gym.Env):
         """
         raise NotImplementedError
 
-    def test(self, horizon=100):
+    # def test(self, horizon=100):
+    # original 100 steps; change to 200 for bimanual need to be reverted
+    def test(self, horizon=200):
         """
         Run the test simulation without any learning algorithm for debugging purposes
         """
         steps, done = 0, False
         obs = self.reset()
-        while not done and steps <= horizon:
+        while not done and steps <= 9999900:
             tic = time.time()
             action = self.get_oracle_action(obs)
             print('\n -> step: {}, action: {}'.format(steps, np.round(action, 4)))
@@ -231,7 +247,7 @@ class SurRoLEnv(gym.Env):
             steps += 1
             toc = time.time()
             print(" -> step time: {:.4f}".format(toc - tic))
-            time.sleep(0.05)
+            # time.sleep(0.05)
         print('\n -> Done: {}\n'.format(done > 0))
 
     def __del__(self):
