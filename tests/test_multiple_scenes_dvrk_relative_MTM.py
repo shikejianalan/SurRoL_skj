@@ -1958,6 +1958,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         super(SurgicalSimulator, self).__init__(env_type, env_params)
         self.id = id
         self.full_dof_list = [5,7,13,19,29,31]
+        self.path = []
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2078,6 +2079,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 # print(f"ecm view out matrix:{self.ecm_view_out}")
                 self.time = task.time
         else:
+            # print("***************************\n")
+            # print("***** Haptic Guidance *****\n")
+            # print("***************************\n")
             if time.time() - self.time > 1/240:
                 self.before_simulation_step()
 
@@ -2087,7 +2091,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self._duration = 0.1
                 step(self._duration)
 
-                self.after_simulation_step()
+                self.after_simulation_step_haptic()
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2123,12 +2127,87 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     # if self.id not in exempt_l:
                     #     self.toggleEcmView()
                     # self.cnt+=1
+                    np.save('mtm_path.npy',self.path)
                     return 
                     # self.start_time=time.time()
                     # self.toggleEcmView()
                     # self.itr += 1
                         
         return Task.cont
+
+    def after_simulation_step_haptic(self):
+        robot_state = self.env._get_robot_state(idx=0)
+        next_PSM_position = robot_state[0:3] ### relative displacement
+        current_MTM_pose = self.mr.setpoint_cp()
+        current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
+        print(current_MTM_position)
+        next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
+
+        next_MTM_position[1] = current_MTM_position[1] + next_PSM_position[0]/(2000)
+        next_MTM_position[0] = current_MTM_position[0] + next_PSM_position[1]/(-2000)
+        next_MTM_position[2] = current_MTM_position[2] + next_PSM_position[2]/(2000)
+        # next_MTM_position = PyKDL.Vector(next_MTM_position)
+        print('here1')
+        next_MTM_pose = PyKDL.Frame()
+        next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
+        print('here2')
+        next_MTM_pose.M = current_MTM_pose.M
+        print('pose:',next_MTM_pose)
+        # self.mr.move_cp(next_MTM_pose).wait()
+        self.MTM_move_to_position(next_MTM_pose, step_num = 10)
+        self.path.append(next_MTM_pose)
+        print(next_MTM_position)
+        # render_info = np.concatenate((anchor_point, master_force, master_endPos, master_velocity), axis = 0)
+                    
+        # ifpass = False 
+        # if self.demo is None:
+        #     ifpass = True
+        # # if frame_count == 0:
+        # #     ifpass = True
+        # while(not ifpass):
+        #     print(self.mr.setpoint_cp().p)
+            
+            # print(anchor_point)
+            # renderForce_right(render_info)
+            # if renderForce_right(render_info) == 1:
+            #     self.end_effector_pos.append(master_endPos)
+
+            # master_endPos[0] = render_info[6]
+            # master_endPos[1] = render_info[7]
+            # master_endPos[2] = render_info[8]
+            # master_force[0] = render_info[3]
+            # master_force[1] = render_info[4]
+            # master_force[2] = render_info[5]
+
+            # print(master_endPos)
+
+            # print(master_endPos)
+
+            # distance = anchor_point - master_endPos
+            # distance = np.linalg.norm(distance)
+            # print(distance)
+            # if distance < 20:
+            #     ifpass=True
+            # time.sleep(0.001)
+    def MTM_move_to_position(self, target, step_num = 10):
+        # while distance > 0.01:
+        #     current_MTM_position = self.mr.setpoint_cp().p
+        #     diff = target.p - current_MTM_position
+        #     distance = np.linalg.norm(diff)
+        #     if diff//ee_step == 0:
+        #         displacement = diff
+        #     else:
+        #         displacement = diff/ (diff//ee_step)
+        #     next_MTM_position = current_MTM_position + diff/()
+        current_MTM_pose = self.mr.setpoint_cp()
+        diff = target.p - current_MTM_pose.p
+
+        for i in range(step_num):
+            next_MTM_position = current_MTM_pose + diff*i/step_num
+            next_MTM_pose = PyKDL.Frame()
+            next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
+            next_MTM_pose.M = target.M
+            self.mr.move_cp(next_MTM_pose).wait()
 
     def load_policy(self, obs, env):
         steps = str(300000)
