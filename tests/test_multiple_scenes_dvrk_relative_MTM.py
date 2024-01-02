@@ -91,6 +91,7 @@ def home_every_scene():
         m.move_jp(goal).wait()
     home()
     del m
+home_every_scene()
 def open_scene(id):
     global app, hint_printed,resetFlag
 
@@ -2015,6 +2016,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
+                print('current MTM pos is: ', self.pos_cur)
                 # print(f"position is: {self.pos}")
                 # print(f"cur position is: {self.pos_cur}")
                 # for i in range(3):
@@ -2111,7 +2113,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
                 # print(f"success: {success}")
                 wait_list=[12,30]
-                if (self.id not in wait_list and success) or time.time()-self.start_time > 10:   
+                if (self.id not in wait_list and success) or time.time()-self.start_time > 100:   
                     # if self.cnt>=6: 
                     #     self.kivy_ui.stop()
                     #     self.app.win.removeDisplayRegion(self.ui_display_region)
@@ -2127,7 +2129,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     # if self.id not in exempt_l:
                     #     self.toggleEcmView()
                     # self.cnt+=1
-                    np.save('mtm_path.npy',self.path)
+                    print('success')
                     return 
                     # self.start_time=time.time()
                     # self.toggleEcmView()
@@ -2136,27 +2138,42 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         return Task.cont
 
     def after_simulation_step_haptic(self):
-        robot_state = self.env._get_robot_state(idx=0)
-        next_PSM_position = robot_state[0:3] ### relative displacement
+        
+        '''
+        use relative displacement
+        '''
+        next_PSM_position = self.psm1_action
+        print('next psm displacement is: ', next_PSM_position)
         current_MTM_pose = self.mr.setpoint_cp()
         current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
-        print(current_MTM_position)
+        print('current MTM position is: ', current_MTM_position)
         next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
 
-        next_MTM_position[1] = current_MTM_position[1] + next_PSM_position[0]/(2000)
-        next_MTM_position[0] = current_MTM_position[0] + next_PSM_position[1]/(-2000)
-        next_MTM_position[2] = current_MTM_position[2] + next_PSM_position[2]/(2000)
+        next_MTM_position[0] = current_MTM_position[0] + next_PSM_position[1]/(-100)
+        next_MTM_position[1] = current_MTM_position[1] + next_PSM_position[0]/(100)
+        next_MTM_position[2] = current_MTM_position[2] + next_PSM_position[2]/(100)
+        # '''
+        # from simulator to mtm
+        # '''
+        # robot_state = self.env._get_robot_state(idx=0)
+        # next_EEF_position = robot_state[0:3]
+        # print(next_EEF_position)
+
+        # current_MTM_pose = self.mr.setpoint_cp()
+        # current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
+        # print(current_MTM_position)
+        # exit()
+        # next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
+        
         # next_MTM_position = PyKDL.Vector(next_MTM_position)
-        print('here1')
         next_MTM_pose = PyKDL.Frame()
         next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
-        print('here2')
+        print('next MTM position is: ', next_MTM_pose.p)
         next_MTM_pose.M = current_MTM_pose.M
-        print('pose:',next_MTM_pose)
         # self.mr.move_cp(next_MTM_pose).wait()
         self.MTM_move_to_position(next_MTM_pose, step_num = 10)
+        print('done')
         self.path.append(next_MTM_pose)
-        print(next_MTM_position)
         # render_info = np.concatenate((anchor_point, master_force, master_endPos, master_velocity), axis = 0)
                     
         # ifpass = False 
@@ -2200,10 +2217,12 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         #         displacement = diff/ (diff//ee_step)
         #     next_MTM_position = current_MTM_position + diff/()
         current_MTM_pose = self.mr.setpoint_cp()
+        print('current_MTM_pose is:', current_MTM_pose)
         diff = target.p - current_MTM_pose.p
-
+        print('difference is', diff)
         for i in range(step_num):
-            next_MTM_position = current_MTM_pose + diff*i/step_num
+            print(i)
+            next_MTM_position = current_MTM_pose.p + diff*i/step_num
             next_MTM_pose = PyKDL.Frame()
             next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
             next_MTM_pose.M = target.M
