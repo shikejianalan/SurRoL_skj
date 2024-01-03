@@ -2093,7 +2093,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self._duration = 0.1
                 step(self._duration)
 
-                self.after_simulation_step_haptic()
+                self.after_simulation_step()
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2220,13 +2220,19 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         print('current_MTM_pose is:', current_MTM_pose)
         diff = target.p - current_MTM_pose.p
         print('difference is', diff)
-        for i in range(step_num):
+        '''
+        Using for loop
+        '''
+        for i in range(1, step_num+1):
             print(i)
             next_MTM_position = current_MTM_pose.p + diff*i/step_num
             next_MTM_pose = PyKDL.Frame()
             next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
             next_MTM_pose.M = target.M
             self.mr.move_cp(next_MTM_pose).wait()
+            # self.env._set_action(self.psm1_action/step_num)
+            # if self.id != 8:
+            #     self.env._step_callback()
 
     def load_policy(self, obs, env):
         steps = str(300000)
@@ -2319,13 +2325,36 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     action = self.actor(input_tensor).data.numpy().flatten()
                     # print(f"retrieved action is: {self.psm1_action}")
                     self.psm1_action = action
-                    self.env._set_action(self.psm1_action)
+                    # self.env._set_action(self.psm1_action)
                 else:
                     obs = self.env._get_obs()
                     action = self.env.get_oracle_action(obs)
                     self.psm1_action = action
-                    self.env._set_action(self.psm1_action)
+                    # self.env._set_action(self.psm1_action)
+                    # self.env._step_callback()
+                '''
+                use relative displacement
+                '''
+                print('next psm displacement is: ', self.psm1_action)
+                current_MTM_pose = self.mr.setpoint_cp()
+                current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
+                print('current MTM position is: ', current_MTM_position)
+                next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
+
+                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-80)
+                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(80)
+                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(80)
+                next_MTM_pose = PyKDL.Frame()
+                next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
+                print('next MTM position is: ', next_MTM_pose.p)
+                next_MTM_pose.M = current_MTM_pose.M
+                # self.mr.move_cp(next_MTM_pose).wait()
+                self.MTM_move_to_position(next_MTM_pose, step_num = 1)
+                print('done')
+                self.env._set_action(self.psm1_action)
+                if self.id != 8:
                     self.env._step_callback()
+                
             else:
                 
                 if self.id in self.full_dof_list:
