@@ -2171,7 +2171,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         print('next MTM position is: ', next_MTM_pose.p)
         next_MTM_pose.M = current_MTM_pose.M
         # self.mr.move_cp(next_MTM_pose).wait()
-        self.MTM_move_to_position(next_MTM_pose, step_num = 10)
+        self.MTM_move_to_position(next_MTM_pose, step_num = 3)
         print('done')
         self.path.append(next_MTM_pose)
         # render_info = np.concatenate((anchor_point, master_force, master_endPos, master_velocity), axis = 0)
@@ -2270,7 +2270,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
     def before_simulation_step(self):
         if (self.id == 8 or self.id == 6) and not self.has_load_policy:
             obs = self.env._get_obs()
+            print('loading policy')
             self.actor, self.o_norm,self.g_norm = self.load_policy(obs,self.env)
+            print('policy loaded')
             self.has_load_policy = True
 
         retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
