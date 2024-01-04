@@ -15,17 +15,7 @@ from surrol.robots.ecm import RENDER_HEIGHT, RENDER_WIDTH, FoV
 from surrol.const import ASSET_DIR_PATH
 from surrol.robots.ecm import Ecm
 
-# load and define the MTM
-import dvrk
-import numpy as np
-import rospy
-import time
-import math
-# move in cartesian space
-import PyKDL
 
-from dvrk import mtm
-    
 class PegTransfer(PsmEnv):
     POSE_BOARD = ((0.55, 0, 0.6861), (0, 0, 0))  # 0.675 + 0.011 + 0.001
     WORKSPACE_LIMITS = ((0.50, 0.60), (-0.05, 0.05), (0.686, 0.745))
@@ -52,24 +42,7 @@ class PegTransfer(PsmEnv):
     def _env_setup(self):
         super(PegTransfer, self)._env_setup()
         self.has_object = True
-        self.m = mtm('MTMR')
 
-        # turn gravity compensation on/off
-        self.m.use_gravity_compensation(True)
-        self.m.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-        # # while(1):
-        print(f'mtm setpoint: {self.m.setpoint_cp()}')
-        print(f'mtm measured: {self.m.measured_cp()}')
-        # print(self.m.setpoint_cp())
-        cp_r = self.m.setpoint_cp().M
-        cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
-        # print(f'setpoint rotat {isRotationMatrix(cp_r)}')
-        # print(f'setpoint rotat to euler{rotationMatrixToEulerAngles(cp_r)}')
-
-        mcp_r = self.m.measured_cp().M
-        mcp_r=np.array([[mcp_r[i,0],mcp_r[i,1],mcp_r[i,2]] for i in range(3)])
-        # print(f'measured rotat {isRotationMatrix(mcp_r)}')
-        # print(f'measured rotat to euler {rotationMatrixToEulerAngles(mcp_r)}')
         # camera
         if self._render_mode == 'human':
             reset_camera(yaw=90.0, pitch=-30.0, dist=0.82 * self.SCALING,
@@ -77,45 +50,6 @@ class PegTransfer(PsmEnv):
         self.ecm = Ecm((0.15, 0.0, 0.8524), #p.getQuaternionFromEuler((0, 30 / 180 * np.pi, 0)),
                        scaling=self.SCALING)
         self.ecm.reset_joint(self.QPOS_ECM)
-        # print(f"ECM pose world: {self.ecm.get_current_position_world()}")
-        ecm_pose = self.ecm.get_current_position()
-        print(f"ECM pose RCM: {ecm_pose}")
-        psm_pose = self.psm1.get_current_position()
-        print(f"PSM pose RCM: {psm_pose}")
-        psm_pose_ori = psm_pose.copy()
-        psm1_transform= np.array([[  1.0,  0.0,          0.0,         -0.20],
-                                    [  0.0, -0.866025404,  0.5,          0.0 ],
-                                    [  0.0, -0.5,         -0.866025404,  0.0 ],
-                                    [  0.0,  0.0,          0.0,          1.0 ]
-                                    ])
-        # psm_measured_cp = np.matmul(np.linalg.inv(ecm_pose), psm_pose_ori)#over ecm's rcm
-        psm_measured_cp=psm_pose_ori #not over ecm
-        # psm_measured_cp= np.matmul(psm1_transform,psm_measured_cp) #over ecm,then transform
-        # psm_measured_cp = np.matmul(psm_pose_ori,psm1_transform)
-        print(f"PSM  pose: {psm_measured_cp}")
-        print(f"mtm orientation{self.m.setpoint_cp().M}")
-        goal = PyKDL.Frame()
-        goal.p = self.m.setpoint_cp().p
-        # # goal.p[0] += 0.05
-        goal.M= self.m.setpoint_cp().M
-        # # cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
-        mapping_mat = np.array([[0,1,0,0],
-                                [-1,0,0,0],
-                                [0,0,1,0],
-                                [0,0,0,1]
-                                ])
-        # psm_measured_cp = np.matmul(mapping_mat,psm_measured_cp)
-        for i in range(3):
-            print(f"previous goal:{goal.M}")
-            for j in range(3):
-                goal.M[i,j]=psm_measured_cp[i][j]
-                # if j==1:
-                #     goal.M[i,j]*=-1
-                # goal.M[i,j]=psm_pose[i][j]
-            print(f"modified goal:{goal.M}")
-        print(goal.M.GetEulerZYX())
-        # print(rotationMatrixToEulerAngles(psm_measured_cp[:3,:3]))
-        self.m.move_cp(goal).wait() #align
         # self.ecm.reset_joint((3.3482885360717773, -0.0017351149581372738, 4.2447919845581055,0))
         # robot
         workspace_limits = self.workspace_limits1
@@ -133,7 +67,7 @@ class PegTransfer(PsmEnv):
                             p.getQuaternionFromEuler(self.POSE_BOARD[1]),
                             globalScaling=self.SCALING)
         self.obj_ids['fixed'].append(obj_id)  # 1
-        
+        print(f'peg transfer\' board size: {p.getVisualShapeData(obj_id)}')
         # group = 1#other objects don't collide with me
         # mask=1 # don't collide with any other object
         # p.setCollisionFilterGroupMask(obj_id, 0,group, mask)
@@ -157,6 +91,8 @@ class PegTransfer(PsmEnv):
             print(f"peg obj id: {obj_id}.")
             self.obj_ids['rigid'].append(obj_id)
         self._blocks = np.array(self.obj_ids['rigid'][-num_blocks:])
+        print(f'peg transfer\' peg size: {p.getVisualShapeData(obj_id)}')
+
         np.random.shuffle(self._blocks)
         for obj_id in self._blocks[:1]:
             # change color to red
@@ -255,6 +191,7 @@ class PegTransfer(PsmEnv):
             pose = get_link_pose(self.obj_id, -1)
             # print(f'meet by checking distance')
             return pose[0][2] > self.goal[2] + 0.01 * self.SCALING
+        return False
 
     def get_oracle_action(self, obs) -> np.ndarray:
         """
@@ -288,57 +225,8 @@ class PegTransfer(PsmEnv):
         joint_positions = self.ecm.inverse_kinematics((pos, None), self.ecm.EEF_LINK_INDEX)  # do not consider orn
         self.ecm.move_joint(joint_positions[:self.ecm.DoF])
         
-# def isRotationMatrix(R):
-#     Rt = np.transpose(R)
-#     shouldBeIdentity = np.dot(Rt, R)
-#     I = np.identity(3, dtype=R.dtype)
-#     n = np.linalg.norm(I - shouldBeIdentity)
-#     return n < 1e-6
-
-# # Calculates rotation matrix to euler angles
-# # The result is the same as MATLAB except the order
-# # of the euler angles ( x and z are swapped ).
-
-
-# def rotationMatrixToEulerAngles(R):
-
-#     assert (isRotationMatrix(R))
-
-#     sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
-
-#     singular = sy < 1e-6
-
-#     if not singular:
-#         x = math.atan2(R[2, 1], R[2, 2])
-#         y = math.atan2(-R[2, 0], sy)
-#         z = math.atan2(R[1, 0], R[0, 0])
-#     else:
-#         x = math.atan2(-R[1, 2], R[1, 1])
-#         y = math.atan2(-R[2, 0], sy)
-#         z = 0
-
-#     return np.array([x, y, z])
 if __name__ == "__main__":
     env = PegTransfer(render_mode='human')  # create one process and corresponding env
-
-    # m = dvrk.mtm('MTMR')
-
-    # # turn gravity compensation on/off
-    # m.use_gravity_compensation(True)
-    # m.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-    # # while(1):
-    # print(f'mtm setpoint: {m.setpoint_cp()}')
-    # print(f'mtm measured: {m.measured_cp()}')
-    # # print(m.setpoint_cp())
-    # cp_r = m.setpoint_cp().M
-    # cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
-    # print(f'setpoint rotat {isRotationMatrix(cp_r)}')
-    # print(f'setpoint rotat to euler{rotationMatrixToEulerAngles(cp_r)}')
-
-    # mcp_r = m.measured_cp().M
-    # mcp_r=np.array([[mcp_r[i,0],mcp_r[i,1],mcp_r[i,2]] for i in range(3)])
-    # print(f'measured rotat {isRotationMatrix(mcp_r)}')
-    # print(f'measured rotat to euler {rotationMatrixToEulerAngles(mcp_r)}')
 
     env.test()
     env.close()

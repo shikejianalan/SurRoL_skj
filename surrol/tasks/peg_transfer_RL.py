@@ -80,12 +80,17 @@ class PegTransferRL(PsmEnv):
         np.random.shuffle(self._pegs[6: 12])
         # self._pegs = [3,1,4,5,6,8,0,2,7,9,10,11]
         self._pegs = [3,1,4,5,0,6,8,10,7,9,2,11]
+        # self._pegs = [2,4,6,8,0,7,5,3,10,1,9,11]
         # print(f"pegs id: {self._pegs}")
         # blocks
         num_blocks = 4
         # for i in range(6, 6 + num_blocks):
+        
         self.red_pegs=[7,9,7,7,9,8,10,7,9]
-        np.random.shuffle(self.red_pegs)
+
+        # Example red_pegs 2
+        # self.red_pegs=[10]
+        # np.random.shuffle(self.red_pegs)
         for i in self.red_pegs[:1]:
             pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
             yaw =  np.deg2rad(0)
@@ -104,6 +109,7 @@ class PegTransferRL(PsmEnv):
         self.obj_id, self.obj_link1 = self._blocks[0], 1
         
         remain = list(set(self.red_pegs)-set(self.red_pegs[:1]))
+        # blue_pegs=[0,3,6,11]+remain
         blue_pegs=[0,3,6,11]+remain
         np.random.shuffle(blue_pegs)
         for i in blue_pegs[:3]:
@@ -114,7 +120,7 @@ class PegTransferRL(PsmEnv):
                                 p.getQuaternionFromEuler((0, 0, yaw)),
                                 useFixedBase=False,
                                 globalScaling=self.SCALING)
-            # print(f"blue peg obj id: {obj_id}.")
+            print(f"blue peg obj id: {obj_id}.")
             self.obj_ids['rigid'].append(obj_id)        
         # print(self.obj_ids['fixed'])
         # print(f'goal peg:{obj_id}')
@@ -136,7 +142,9 @@ class PegTransferRL(PsmEnv):
         """ Samples a new goal and returns it.
         """
         goals=[1,2,4,4,5]
-        np.random.shuffle(goals) 
+        # Example goal 2
+        # goals=[5,8,2,4,4]
+        # np.random.shuffle(goals) 
         goal_id = goals[1]
         #correspond to peg id 8 and 10
         if self.red_pegs[0]==8 and (goal_id==4 or goal_id == 2) :

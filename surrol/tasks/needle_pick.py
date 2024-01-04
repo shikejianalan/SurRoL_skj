@@ -75,14 +75,32 @@ class NeedlePick(PsmEnv):
         self.obj_ids['fixed'].append(obj_id)  # 1
 
         # needle
-        yaw = (np.random.rand() - 0.5) * np.pi
-        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm.urdf'),
-                            (workspace_limits[0].mean() + (np.random.rand() - 0.5) * 0.1,  # TODO: scaling
-                             workspace_limits[1].mean() + (np.random.rand() - 0.5) * 0.1,
+        # random pose of needle
+        # yaw = (np.random.rand() - 0.5) * np.pi
+        # obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm_RL.urdf'),
+        #                     (workspace_limits[0].mean() + (np.random.rand() - 0.5) * 0.1,  # TODO: scaling
+        #                      workspace_limits[1].mean() + (np.random.rand() - 0.5) * 0.1,
+        #                      workspace_limits[2][0] + 0.01),
+        #                     p.getQuaternionFromEuler((0, 0, yaw)),
+        #                     useFixedBase=False,
+        #                     globalScaling=self.SCALING)
+        yaw = (0 - 0.5) * np.pi
+        # Example 1
+        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm_RL.urdf'),
+                            (workspace_limits[0].mean(),  # TODO: scaling
+                             workspace_limits[1].mean(),
                              workspace_limits[2][0] + 0.01),
                             p.getQuaternionFromEuler((0, 0, yaw)),
                             useFixedBase=False,
                             globalScaling=self.SCALING)
+        # Example 2
+        # obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm_RL.urdf'),
+        #                     (workspace_limits[0].mean() + (0.2 - 0.5) * 0.1,  # TODO: scaling
+        #                      workspace_limits[1].mean() + (0 - 0.8) * 0.1,
+        #                      workspace_limits[2][0] + 0.01),
+        #                     p.getQuaternionFromEuler((0, 0, yaw)),
+        #                     useFixedBase=False,
+        #                     globalScaling=self.SCALING)
         p.changeVisualShape(obj_id, -1, specularColor=(80, 80, 80))
         self.obj_ids['rigid'].append(obj_id)  # 0
         self.obj_id, self.obj_link1 = self.obj_ids['rigid'][0], 1
@@ -91,9 +109,18 @@ class NeedlePick(PsmEnv):
         """ Samples a new goal and returns it.
         """
         workspace_limits = self.workspace_limits1
-        goal = np.array([workspace_limits[0].mean() + 0.01 * np.random.randn() * self.SCALING,
-                         workspace_limits[1].mean() + 0.01 * np.random.randn() * self.SCALING,
+        # random pose of goal
+        # goal = np.array([workspace_limits[0].mean() + 0.01 * np.random.randn() * self.SCALING,
+        #                  workspace_limits[1].mean() + 0.01 * np.random.randn() * self.SCALING,
+        #                  workspace_limits[2][1] - 0.04 * self.SCALING])
+        # Example goal 1
+        goal = np.array([workspace_limits[0].mean(),
+                         workspace_limits[1].mean() + 0.01 * 0.2 * self.SCALING,
                          workspace_limits[2][1] - 0.04 * self.SCALING])
+        # Example goal 2
+        # goal = np.array([workspace_limits[0].mean() + 0.01 * 0.6 * self.SCALING,
+        #                  workspace_limits[1].mean() + 0.01 * 0.9 * self.SCALING,
+        #                  workspace_limits[2][1] - 0.05 * self.SCALING])
         return goal.copy()
 
     def _sample_goal_callback(self):
@@ -172,7 +199,7 @@ class NeedlePick(PsmEnv):
 
 
 if __name__ == "__main__":
-    env = NeedlePick(render_mode='human')  # create one process and corresponding env
+    env = NeedlePick(render_mode='rgb_array')  # create one process and corresponding env
 
     env.test()
     env.close()
