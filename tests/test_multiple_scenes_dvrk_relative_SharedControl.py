@@ -1,3 +1,4 @@
+import pickle
 import re,os
 from kivy.lang import Builder
 import numpy as np
@@ -1970,6 +1971,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.id = id
         self.full_dof_list = [5,7,13,19,29,31]
         self.path = []
+        self.pose = []
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2028,6 +2030,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
                 print('current MTM pos is: ', self.pos_cur)
                 print('current MTM Matrix is:', self.mr.setpoint_cp().M)
+                print(type(self.mr.setpoint_cp().M))
+                self.path.append([self.mr.setpoint_cp()])
                 # print(f"position is: {self.pos}")
                 # print(f"cur position is: {self.pos_cur}")
                 # for i in range(3):
@@ -2081,7 +2085,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
 
                 # Step simulation
                 p.stepSimulation()
+                # change 1
                 self.after_simulation_step()
+                # self.after_simulation_step_haptic()
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2091,6 +2097,12 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 p.setGravity(0,0,-10.0)
                 # print(f"ecm view out matrix:{self.ecm_view_out}")
                 self.time = task.time
+                # print('self.path',self.path)
+                try:
+                    with open('save_file.pkl', 'wb') as f:
+                        pickle.dump(self.path, f)
+                except Exception as e:
+                    print(str(e))
         else:
             # print("***************************\n")
             # print("***** Haptic Guidance *****\n")
@@ -2374,6 +2386,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 next_MTM_pose.M = current_MTM_pose.M
                 # self.mr.move_cp(next_MTM_pose).wait()
                 self.MTM_move_to_position(next_MTM_pose, step_num = 10)
+                
                 print('done')
                 # while distance > 0.0001:
                 #     distance = self.MTM_move_to_position(next_MTM_pose, step_num = 10)
