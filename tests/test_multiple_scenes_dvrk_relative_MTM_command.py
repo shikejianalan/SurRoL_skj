@@ -13,7 +13,14 @@ m = mtm('MTML')
 m.body_set_cf_orientation_absolute(True)
 
 # about 2N force in y direction
-m.body.servo_cf(numpy.array([0.0, 0.0, 2.0, 0.0, 0.0, 0.0]))
+timestop = 0
+while timestop < 50000:
+    m.body.servo_cf(numpy.array([0, 0.0, 0.0, 0.0, 0, 0]))
+    print(m.body.measured_cf())
+    timestop += 1
+
+
+
 
 # lock the MTM wrist orientation
 m.lock_orientation_as_is()
@@ -23,4 +30,4 @@ m.use_gravity_compensation(True)
 
 # turn off forces
 # self.arm.body.servo_cf(numpy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-m.body.servo_cf(numpy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+# m.body.servo_cf(numpy.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
