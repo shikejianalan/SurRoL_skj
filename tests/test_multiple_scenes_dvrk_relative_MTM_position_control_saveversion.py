@@ -1973,6 +1973,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.id = id
         self.full_dof_list = [5,7,13,19,29,31]
         self.path = []
+        self.trajectory = []
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2205,6 +2206,13 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     # if self.id not in exempt_l:
                     #     self.toggleEcmView()
                     # self.cnt+=1
+                    try:
+                        import pickle
+                        with open('./saved_peg_transfer_path.pkl', 'wb') as f:
+                            pickle.dump(self.trajectory, f)
+                        print(len(self.trajectory))
+                    except Exception as e:
+                        print(str(e))
                     print('success')
                     return 
                     # self.start_time=time.time()
@@ -2296,13 +2304,13 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     action = self.actor(input_tensor).data.numpy().flatten()
                     # print(f"retrieved action is: {self.psm1_action}")
                     self.psm1_action = action
-                    # self.env._set_action(self.psm1_action)
+                    self.env._set_action(self.psm1_action)
                 else:
                     obs = self.env._get_obs()
                     action = self.env.get_oracle_action(obs)
                     self.psm1_action = action
-                    # self.env._set_action(self.psm1_action)
-                    # self.env._step_callback()
+                    self.env._set_action(self.psm1_action)
+                    self.env._step_callback()
                 
                 print('next psm displacement is: ', self.psm1_action)
                 current_MTM_pose = self.mr.setpoint_cp()
@@ -2310,13 +2318,14 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 print('current MTM position is: ', current_MTM_position)
                 next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
 
-                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-40)
-                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(40)
-                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(40)
+                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-45)
+                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(45)
+                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(45)
                 next_MTM_pose = PyKDL.Frame()
                 next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
                 print('next MTM position is: ', next_MTM_pose.p)
                 next_MTM_pose.M = current_MTM_pose.M
+                self.trajectory.append(next_MTM_pose)
                 self.MTM_move_to_position(next_MTM_pose, step_num = 1)
                 # move_to_target_forcebased(self.mr, next_MTM_pose.p)
                 # print('done')
@@ -2332,13 +2341,13 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     retrived_action, mat = self.MTMR2PSM(retrived_action,mat)
                     self.psm1_action = retrived_action
                     print("mat is",mat,'psm action is',self.psm1_action)
-                    self.env._set_action(self.psm1_action,mat)
-                    self.env._step_callback()
+                    # self.env._set_action(self.psm1_action,mat)
+                    # self.env._step_callback()
                 else:
                     retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
                     retrived_action = self.MTMR2PSM(retrived_action)
                     self.psm1_action = retrived_action
-                    self.env._set_action(self.psm1_action)
+                    # self.env._set_action(self.psm1_action)
 
 
             else:                   

@@ -67,6 +67,9 @@ from dvrk import mtm
 
 from direct.task import Task
 from surrol.utils.pybullet_utils import step
+from simple_pid import PID
+
+force0 = np.array([0, 0, 0, 0, 0, 0])
 
 app = None
 hint_printed = False
@@ -2247,6 +2250,29 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             # if distance < 20:
             #     ifpass=True
             # time.sleep(0.001)
+    def move_to_target_forcebased(self,target_position):
+        self.mr.body_set_cf_orientation_absolute(True)
+        self.mr.use_gravity_compensation(True)
+        current_position = self.mr.setpoint_cp().p
+        diff = np.array(target_position) - np.array(current_position)
+        distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()]))   
+        print(distance)  
+        pid_x = PID(5, 0.01, 0.1, setpoint = target_position[0])
+        pid_y = PID(5, 0.01, 0.1, setpoint = target_position[1])
+        pid_z = PID(5, 0.01, 0.1, setpoint = target_position[2]) 
+
+        while (distance > 0.01) :
+            force_scale = 10.0
+            force = np.array([pid_x(current_position[0]), pid_y(current_position[1]), pid_z(current_position[2]), 0, 0, 0])* force_scale
+            self.mr.body.servo_cf(force)        
+            
+            current_position = self.mr.setpoint_cp().p
+            diff = np.array(target_position) - np.array(current_position)
+            distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()]))    
+            print(distance)          
+        self.mr.body.servo_cf(force0)
+        print('over')
+
     def MTM_move_to_position(self, target, step_num = 10):
         # while distance > 0.01:
         #     current_MTM_position = self.mr.setpoint_cp().p
@@ -2430,8 +2456,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 next_MTM_pose.M = current_MTM_pose.M
                 # self.mr.move_cp(next_MTM_pose).wait()
                 # self.MTM_move_to_position(next_MTM_pose, step_num = 10)
-                self.MTM_move_to_position_forcebased(next_MTM_pose, step_num = 10)
-                
+                # self.MTM_move_to_position_forcebased(next_MTM_pose, step_num = 10)
+                self.move_to_target_forcebased(next_MTM_pose.p)
                 print('done')
                 # while distance > 0.0001:
                 #     distance = self.MTM_move_to_position(next_MTM_pose, step_num = 10)
