@@ -1,4 +1,3 @@
-import pickle
 import re,os
 from kivy.lang import Builder
 import numpy as np
@@ -67,9 +66,9 @@ from dvrk import mtm
 
 from direct.task import Task
 from surrol.utils.pybullet_utils import step
-from simple_pid import PID
 
-force0 = np.array([0, 0, 0, 0, 0, 0])
+######
+from dvrk_control.dvrk_control import *
 
 app = None
 hint_printed = False
@@ -1974,8 +1973,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.id = id
         self.full_dof_list = [5,7,13,19,29,31]
         self.path = []
-        self.state = []
-        self.pose = []
+        self.trajectory = []
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2034,9 +2032,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
                 print('current MTM pos is: ', self.pos_cur)
                 print('current MTM Matrix is:', self.mr.setpoint_cp().M)
-                print(type(self.mr.setpoint_cp().M))
-                self.path.append([self.mr.setpoint_cp()])
-                self.state.append([self.mr.measured_js()])
                 # print(f"position is: {self.pos}")
                 # print(f"cur position is: {self.pos_cur}")
                 # for i in range(3):
@@ -2056,6 +2051,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             for i in range(3):
                 for j in range(3):
                     mat[i][j]= goal_orn[i,j]
+            return psm1_action, mat
             
         else:
             if self.first[1]:
@@ -2079,6 +2075,63 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3]=0
+            return psm1_action
+
+    def MTMR2PSM(self,psm1_action,mat=None):
+        # psm_pose_world = np.eye(4)
+        if self.id in self.full_dof_list:
+            if self.first[1]:
+                for i in range(3):
+                    psm1_action[i] =0
+                self.first[1] = False
+            else:
+                self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
+                print('current MTM pos is: ', self.pos_cur)
+                print('current MTM Matrix is:', self.mr.setpoint_cp().M)
+                # print(f"position is: {self.pos}")
+                # print(f"cur position is: {self.pos_cur}")
+                # for i in range(3):
+                #     if i ==0:
+                #         scaling = -20
+                #     else:
+                #         scaling = 20
+                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(50)
+                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-50)
+                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(50)
+                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
+                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
+                self.pos[1] = self.pos_cur.copy()
+            psm1_action[3] = self.mr.gripper.measured_jp()[0]
+            goal_orn = self.mr.setpoint_cp().M
+            print("goal orn: ",goal_orn)
+            for i in range(3):
+                for j in range(3):
+                    mat[i][j]= goal_orn[i,j]
+            return psm1_action, mat
+        else:
+            print(self.id)
+            if self.first[1]:
+                for i in range(3):
+                    psm1_action[i] =0
+                psm1_action[4] = 1
+                self.first[1] = False
+            else:
+                self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
+                # print(f"position is: {self.pos}")
+                # print(f"cur position is: {self.pos_cur}")
+                # for i in range(3):
+                #     if i ==0:
+                #         scaling = -20
+                #     else:
+                #         scaling = 20
+                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(50)
+                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-50)
+                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(50)
+                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
+                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
+                self.pos[1] = self.pos_cur.copy()
+            psm1_action[3]=0
+            return psm1_action
 
     def _step_simulation_task(self, task):
         """Step simulation
@@ -2090,9 +2143,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
 
                 # Step simulation
                 p.stepSimulation()
-                # change 1
                 self.after_simulation_step()
-                # self.after_simulation_step_haptic()
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2102,29 +2153,11 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 p.setGravity(0,0,-10.0)
                 # print(f"ecm view out matrix:{self.ecm_view_out}")
                 self.time = task.time
-                # print('self.path',self.path)
-                # try:
-                #     with open('save_file.pkl', 'wb') as f:
-                #         pickle.dump(self.path, f)
-                # except Exception as e:
-                #     print(str(e))
-                print('joint_state',self.state)
-
         else:
             # print("***************************\n")
             # print("***** Haptic Guidance *****\n")
             # print("***************************\n")
             if time.time() - self.time > 1/240:
-
-                # self.before_simulation_step()
-
-                # # Step simulation
-                # #pb.stepSimulation()
-                # # self._duration = 0.1 # needle 
-                # self._duration = 0.1
-                # step(self._duration)
-
-                # self.after_simulation_step()
                 try:
                     self.before_simulation_step()
 
@@ -2137,6 +2170,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.after_simulation_step()
                 except Exception as e:
                     print(str(e))
+   
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2172,6 +2206,13 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     # if self.id not in exempt_l:
                     #     self.toggleEcmView()
                     # self.cnt+=1
+                    try:
+                        import pickle
+                        with open('./saved_peg_transfer_action_psm.pkl', 'wb') as f:
+                            pickle.dump(self.trajectory, f)
+                        print(len(self.trajectory))
+                    except Exception as e:
+                        print(str(e))
                     print('success')
                     return 
                     # self.start_time=time.time()
@@ -2180,119 +2221,16 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                         
         return Task.cont
 
-    def after_simulation_step_haptic(self):
-        
-        '''
-        use relative displacement
-        '''
-        next_PSM_position = self.psm1_action
-        print('next psm displacement is: ', next_PSM_position)
-        current_MTM_pose = self.mr.setpoint_cp()
-        current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
-        print('current MTM position is: ', current_MTM_position)
-        next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
-
-        next_MTM_position[0] = current_MTM_position[0] + next_PSM_position[1]/(-100)
-        next_MTM_position[1] = current_MTM_position[1] + next_PSM_position[0]/(100)
-        next_MTM_position[2] = current_MTM_position[2] + next_PSM_position[2]/(100)
-        # '''
-        # from simulator to mtm
-        # '''
-        # robot_state = self.env._get_robot_state(idx=0)
-        # next_EEF_position = robot_state[0:3]
-        # print(next_EEF_position)
-
-        # current_MTM_pose = self.mr.setpoint_cp()
-        # current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
-        # print(current_MTM_position)
-        # exit()
-        # next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
-        
-        # next_MTM_position = PyKDL.Vector(next_MTM_position)
-        next_MTM_pose = PyKDL.Frame()
-        next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
-        print('next MTM position is: ', next_MTM_pose.p)
-        next_MTM_pose.M = current_MTM_pose.M
-        # self.mr.move_cp(next_MTM_pose).wait()
-        # self.MTM_move_to_position(next_MTM_pose, step_num = 3)
-        self.MTM_move_to_position_forcebased(next_MTM_pose, step_num = 10)
-        print('done')
-        self.path.append(next_MTM_pose)
-        # render_info = np.concatenate((anchor_point, master_force, master_endPos, master_velocity), axis = 0)
-                    
-        # ifpass = False 
-        # if self.demo is None:
-        #     ifpass = True
-        # # if frame_count == 0:
-        # #     ifpass = True
-        # while(not ifpass):
-        #     print(self.mr.setpoint_cp().p)
-            
-            # print(anchor_point)
-            # renderForce_right(render_info)
-            # if renderForce_right(render_info) == 1:
-            #     self.end_effector_pos.append(master_endPos)
-
-            # master_endPos[0] = render_info[6]
-            # master_endPos[1] = render_info[7]
-            # master_endPos[2] = render_info[8]
-            # master_force[0] = render_info[3]
-            # master_force[1] = render_info[4]
-            # master_force[2] = render_info[5]
-
-            # print(master_endPos)
-
-            # print(master_endPos)
-
-            # distance = anchor_point - master_endPos
-            # distance = np.linalg.norm(distance)
-            # print(distance)
-            # if distance < 20:
-            #     ifpass=True
-            # time.sleep(0.001)
-    def move_to_target_forcebased(self,target_position):
-        self.mr.body_set_cf_orientation_absolute(True)
-        self.mr.use_gravity_compensation(True)
-        current_position = self.mr.setpoint_cp().p
-        diff = np.array(target_position) - np.array(current_position)
-        distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()]))   
-        print(distance)  
-        pid_x = PID(5, 0.01, 0.1, setpoint = target_position[0])
-        pid_y = PID(5, 0.01, 0.1, setpoint = target_position[1])
-        pid_z = PID(5, 0.01, 0.1, setpoint = target_position[2]) 
-
-        while (distance > 0.01) :
-            force_scale = 10.0
-            force = np.array([pid_x(current_position[0]), pid_y(current_position[1]), pid_z(current_position[2]), 0, 0, 0])* force_scale
-            self.mr.body.servo_cf(force)        
-            
-            current_position = self.mr.setpoint_cp().p
-            diff = np.array(target_position) - np.array(current_position)
-            distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()]))    
-            print(distance)          
-        self.mr.body.servo_cf(force0)
-        print('over')
-
     def MTM_move_to_position(self, target, step_num = 10):
-        # while distance > 0.01:
-        #     current_MTM_position = self.mr.setpoint_cp().p
-        #     diff = target.p - current_MTM_position
-        #     distance = np.linalg.norm(diff)
-        #     if diff//ee_step == 0:
-        #         displacement = diff
-        #     else:
-        #         displacement = diff/ (diff//ee_step)
-        #     next_MTM_position = current_MTM_position + diff/()
         current_MTM_pose = self.mr.setpoint_cp()
         print('current_MTM_pose is:', current_MTM_pose)
         diff = target.p - current_MTM_pose.p
         print('difference is', diff)
+        distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()])) 
+        print('distance is: ', distance)
         '''
         Using for loop
         '''
-
-        # self.mr.body.servo_cf(np.array([0.0, 0.0, 6.0, 0.0, 0.0, 0.0]))
-
         for i in range(1, step_num+1):
             print(i)
             next_MTM_position = current_MTM_pose.p + diff*i/step_num
@@ -2305,46 +2243,14 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         diff = next_MTM_pose.p - _current_MTM_pose.p
         distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()])) 
         return distance
-        '''
-        Using distance checking
-        '''
-        # distance = 1
-        # while distance > 1e-5:
-        #     _current_MTM_pose = self.mr.setpoint_cp()
-        #     diff = next_MTM_pose.p - _current_MTM_pose.p
-        #     distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()]))
-        #     print(distance)
-
-    def MTM_move_to_position_forcebased(self, target, step_num = 10):
-        try:
-            print('start')
-            current_MTM_pose = self.mr.setpoint_cp()
-            print('current_MTM_pose is:', current_MTM_pose)
-            diff = target.p - current_MTM_pose.p
-            print('difference is', diff)
-            distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()])) 
-            print('distance is', distance)
-            while(distance > 0.01):
-                self.mr.body.servo_cf(np.array([diff.x(), diff.y(), diff.z(), 0.0, 0.0, 0.0])*20)
-                
-                current_MTM_pose = self.mr.setpoint_cp()
-                print('current_MTM_pose is:', current_MTM_pose)
-                diff = target.p - current_MTM_pose.p
-                print('difference is', diff)
-                distance = np.linalg.norm(np.array([diff.x(), diff.y(), diff.z()])) 
-                print('distance50 is', distance*20)
-            print('print')
-
-        except Exception as e:
-            print(str(e))
 
 
     def load_policy(self, obs, env):
         steps = str(300000)
         if self.id == 8:
-            model_file = './peg_transfer_model'
+            model_file = '/home/kj/skjsurrol/SurRoL_skj/tests/peg_transfer_model'
         if self.id == 6:
-            model_file = './needle_pick_model'
+            model_file = '/home/kj/skjsurrol/SurRoL_skj/tests/needle_pick_model'
 
         actor_params = os.path.join(model_file, 'actor_' + steps + '.pt')
         actor_params = torch.load(actor_params)
@@ -2386,41 +2292,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             print('policy loaded')
             self.has_load_policy = True
 
-        retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
-        # to do define a new getdeviceaction_right function for mtm 
-        # getDeviceAction_right(retrived_action)
-        if self.id in self.full_dof_list:
-            retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
-            mat = np.eye(4)
-            self.get_MTMR_position_action(retrived_action,mat)
-
-        else:
-            self.get_MTMR_position_action(retrived_action)
-
-        if self.demo:
-            obs = self.env._get_obs()
-            action = self.env.get_oracle_action(obs)
+            
         if self.env.ACTION_SIZE != 3 and self.env.ACTION_SIZE != 1:
-
-            # haptic right
-            # retrived_action-> x,y,z, angle, buttonState(0,1,2)
-            # if retrived_action[4] == 2:
-            #     self.psm1_action[0] = 0
-            #     self.psm1_action[1] = 0
-            #     self.psm1_action[2] = 0
-            #     self.psm1_action[3] = 0            
-         
-            # else:
-            #     self.psm1_action[0] = retrived_action[2]*0.9
-            #     self.psm1_action[1] = retrived_action[0]*0.9
-            #     self.psm1_action[2] = retrived_action[1]*0.9
-            #     self.psm1_action[3] = -retrived_action[3]/math.pi*180*0.5
-
-            # if retrived_action[4] == 0:
-            #     self.psm1_action[4] = 1
-            # if retrived_action[4] == 1:
-            #     self.psm1_action[4] = -0.5
-            self.psm1_action = retrived_action
 
             # print(f"len of retrieved action:{len(retrived_action)}")
             if self.demo:
@@ -2429,50 +2302,67 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     o, g = obs['observation'], obs['desired_goal']
                     input_tensor = self._preproc_inputs(o, g, self.o_norm, self.g_norm)
                     action = self.actor(input_tensor).data.numpy().flatten()
+                    self.trajectory.append(action)
                     # print(f"retrieved action is: {self.psm1_action}")
                     self.psm1_action = action
-                    # self.env._set_action(self.psm1_action)
+                    self.env._set_action(self.psm1_action)
                 else:
                     obs = self.env._get_obs()
                     action = self.env.get_oracle_action(obs)
                     self.psm1_action = action
-                    # self.env._set_action(self.psm1_action)
-                    # self.env._step_callback()
-                '''
-                use relative displacement
-                '''
+                    self.env._set_action(self.psm1_action)
+                    self.env._step_callback()
+                
                 print('next psm displacement is: ', self.psm1_action)
                 current_MTM_pose = self.mr.setpoint_cp()
                 current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
                 print('current MTM position is: ', current_MTM_position)
                 next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
 
-                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-40)
-                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(40)
-                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(40)
+                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-45)
+                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(45)
+                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(45)
                 next_MTM_pose = PyKDL.Frame()
                 next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
                 print('next MTM position is: ', next_MTM_pose.p)
                 next_MTM_pose.M = current_MTM_pose.M
-                # self.mr.move_cp(next_MTM_pose).wait()
-                # self.MTM_move_to_position(next_MTM_pose, step_num = 10)
-                # self.MTM_move_to_position_forcebased(next_MTM_pose, step_num = 10)
-                self.move_to_target_forcebased(next_MTM_pose.p)
-                print('done')
-                # while distance > 0.0001:
-                #     distance = self.MTM_move_to_position(next_MTM_pose, step_num = 10)
-                self.env._set_action(self.psm1_action)
-                if self.id != 8:
-                    self.env._step_callback()
+                self.MTM_move_to_position(next_MTM_pose, step_num = 1)
 
-                
-            else:
+                '''
+                use relative displacement
+
+                Update PSM using MTM position
+                '''
+
+                if self.id in self.full_dof_list:
+                    retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
+                    mat = np.eye(4)
+                    retrived_action, mat = self.MTMR2PSM(retrived_action,mat)
+                    self.psm1_action = retrived_action
+                    print("mat is",mat,'psm action is',self.psm1_action)
+                    # self.env._set_action(self.psm1_action,mat)
+                    # self.env._step_callback()
+                else:
+                    retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
+                    retrived_action = self.MTMR2PSM(retrived_action)
+                    self.psm1_action = retrived_action
+                    # self.env._set_action(self.psm1_action)
+
+
+            else:                   
                 
                 if self.id in self.full_dof_list:
+                    retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
+                    mat = np.eye(4)
+                    retrived_action, mat = self.get_MTMR_position_action(retrived_action,mat)
+                    self.psm1_action = retrived_action
                     print("mat is",mat,'psm action is',self.psm1_action)
                     self.env._set_action(self.psm1_action,mat)
                     self.env._step_callback()
                 else:
+                    retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
+                    retrived_action = self.get_MTMR_position_action(retrived_action)
+                    self.psm1_action = retrived_action
                     self.env._set_action(self.psm1_action)
                     self.env._step_callback()
         

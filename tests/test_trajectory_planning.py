@@ -53,8 +53,6 @@ from surrol.robots.ecm import Ecm
 from haptic_src._test import initTouch_right, closeTouch_right, getDeviceAction_right, startScheduler, stopScheduler
 from haptic_src._test import initTouch_left, closeTouch_left, getDeviceAction_left
 
-import dvrk
-import numpy as np
 import rospy
 import sys
 import time
@@ -74,6 +72,7 @@ from dvrk_control.dvrk_control import *
 app = None
 hint_printed = False
 resetFlag = False
+
 def frame_to_matrix(frame):
     rotation = np.array([[frame.M[0,0], frame.M[0,1], frame.M[0,2]],
                          [frame.M[1,0], frame.M[1,1], frame.M[1,2]],
@@ -85,6 +84,7 @@ def frame_to_matrix(frame):
     transformation_matrix[:3, 3] = translation
     
     return transformation_matrix
+
 def home_every_scene():
     m = mtm('MTMR')
     # print with node id
@@ -105,7 +105,9 @@ def home_every_scene():
         m.move_jp(goal).wait()
     home()
     del m
+
 home_every_scene()
+
 def open_scene(id):
     global app, hint_printed,resetFlag
 
@@ -131,80 +133,8 @@ def open_scene(id):
                 scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id) 
             else:
                 scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id,demo=1)
-    # if id == 0:
-    #     scene = StartPage()
-    # elif id == 1:
-    #     scene = ECMPage()    
-    # elif id == 2:
-    #     scene = NeedlePage()
-    # elif id == 3:
-    #     scene = PegPage()
-    # elif id == 4:
-    #     scene = PickPlacePage()
-    # elif id == 5:
-    #     scene = SurgicalSimulator(NeedlePick, {'render_mode': 'human'},id)
-    # elif id == 6:
-    #     scene = SurgicalSimulator(NeedlePick, {'render_mode': 'human'},id,demo=1)
-    # elif id == 7:
-    #     scene = SurgicalSimulator(PegTransfer, {'render_mode': 'human'},id)
-    # elif id == 8:
-    #     scene = SurgicalSimulator(PegTransfer, {'render_mode': 'human'},id,demo=1)
-    # elif id == 9:
-    #     scene = SurgicalSimulatorBimanual(NeedleRegrasp, {'render_mode': 'human'}, jaw_states=[1.0, -0.5],id=id)
-    # elif id == 10:
-    #     scene = SurgicalSimulatorBimanual(NeedleRegrasp, {'render_mode': 'human'}, jaw_states=[1.0, -0.5],id=id,demo=1)
-    # elif id == 11:
-    #     scene = SurgicalSimulatorBimanual(BiPegTransfer, {'render_mode': 'human'}, jaw_states=[1.0, 1.0],id=id)
-    # elif id == 12:
-    #     scene = SurgicalSimulatorBimanual(BiPegTransfer, {'render_mode': 'human'}, jaw_states=[1.0, 1.0],id=id,demo=1)
-    # elif id == 13:
-    #     scene = SurgicalSimulator(PickAndPlace, {'render_mode': 'human'},id)
-    # elif id == 14:
-    #     scene = SurgicalSimulator(PickAndPlace, {'render_mode': 'human'},id,demo=1)
-    # elif id == 15:
-    #     scene = SurgicalSimulator(PegBoard, {'render_mode': 'human'},id)
-    # elif id == 16:
-    #     scene = SurgicalSimulator(PegBoard, {'render_mode': 'human'},id)
-    # elif id == 17:
-    #     scene = SurgicalSimulatorBimanual(NeedleRings, {'render_mode': 'human'}, jaw_states=[1.0, 1.0],id=id)
-    # elif id == 18:
-    #     scene = SurgicalSimulatorBimanual(NeedleRings, {'render_mode': 'human'}, jaw_states=[1.0, 1.0],id=id,demo=1)
-    # elif id == 19:
-    #     scene = SurgicalSimulator(MatchBoard, {'render_mode': 'human'},id)
-    # elif id == 20:
-    #     scene = SurgicalSimulator(MatchBoard, {'render_mode': 'human'},id,demo=1)
-    # elif id == 21:
-    #     scene = SurgicalSimulator(ECMReach, {'render_mode': 'human'},id)
-    # elif id == 22:
-    #     scene = SurgicalSimulator(ECMReach, {'render_mode': 'human'},id,demo=1)
-    # elif id == 23:
-    #     scene = SurgicalSimulator(MisOrient, {'render_mode': 'human'},id)
-    # elif id == 24:
-    #     scene = SurgicalSimulator(MisOrient, {'render_mode': 'human'},id,demo=1)
-    # elif id == 25:
-    #     scene = SurgicalSimulator(StaticTrack, {'render_mode': 'human'},id)
-    # elif id == 26:
-    #     scene = SurgicalSimulator(StaticTrack, {'render_mode': 'human'},id,demo=1)
-    # elif id == 27:
-    #     scene = SurgicalSimulator(ActiveTrack, {'render_mode': 'human'},id)
-    # elif id == 28:
-    #     scene = SurgicalSimulator(ActiveTrack, {'render_mode': 'human'},id,demo=1)
-    # elif id == 29:
-    #     scene = SurgicalSimulator(NeedleReach, {'render_mode': 'human'},id)
-    # elif id == 30:
-    #     scene = SurgicalSimulator(NeedleReach, {'render_mode': 'human'},id,demo=1)
-    # elif id == 31:
-    #     scene = SurgicalSimulator(GauzeRetrieve, {'render_mode': 'human'},id)
-    # elif id == 32:
-    #     scene = SurgicalSimulator(GauzeRetrieve, {'render_mode': 'human'},id,demo=1)
-
-    # if id in (1, 2) and not hint_printed:
-    #     print('Press <W><A><S><D><E><Q><Space> to control the PSM.')
-    #     hint_printed = True
-    
     if scene:
         app.play(scene)
-
 
 selection_panel_kv = '''MDBoxLayout:
     orientation: 'vertical'
@@ -1224,7 +1154,6 @@ needle_panel_kv = '''MDBoxLayout:
 '''
 
 
-
 ECM_panel_kv = '''MDBoxLayout:
     orientation: 'vertical'
 
@@ -1478,6 +1407,7 @@ ECM_panel_kv = '''MDBoxLayout:
 
 
 '''
+
 class SelectionUI(MDApp):
 
     def __init__(self, panda_app, display_region):
@@ -1493,9 +1423,6 @@ class SelectionUI(MDApp):
         self.screen.ids.btn1.bind(on_press = lambda _: open_scene(1))
         self.screen.ids.btn2.bind(on_press = lambda _: open_scene(2))
         self.screen.ids.btn3.bind(on_press = lambda _: open_scene(3))
-        # self.screen.ids.btn4.bind(on_press = lambda _: open_scene(4))
-
-        # self.screen.ids.btn11.bind(on_press = lambda _: open_scene(11))
 
 class NeedleUI(MDApp):
 
@@ -1515,7 +1442,6 @@ class NeedleUI(MDApp):
         self.screen.ids.btn4.bind(on_press = lambda _: open_scene(9))
         self.screen.ids.btn5.bind(on_press = lambda _: open_scene(0))
         self.screen.ids.btn6.bind(on_press = lambda _: open_scene(2))
-
 
 class PegUI(MDApp):
 
@@ -1558,7 +1484,6 @@ class PickPlaceUI(MDApp):
         self.screen.ids.btn6.bind(on_press = lambda _: open_scene(4))
         self.screen.ids.btn7.bind(on_press = lambda _: open_scene(4))
 
-
 class ECMUI(MDApp):
 
     def __init__(self, panda_app, display_region):
@@ -1577,7 +1502,6 @@ class ECMUI(MDApp):
         self.screen.ids.btn4.bind(on_press = lambda _: open_scene(27))
         self.screen.ids.btn5.bind(on_press = lambda _: open_scene(0))
         self.screen.ids.btn6.bind(on_press = lambda _: open_scene(1))
-
 
 class StartPage(Scene):
     def __init__(self):
@@ -1702,6 +1626,7 @@ menu_bar_kv_haptic = '''MDBoxLayout:
         md_bg_color: app.theme_cls.bg_light
         size_hint: 0.25, 1.0
 '''
+
 menu_bar_kv_RL = '''MDBoxLayout:
     md_bg_color: (1, 0, 0, 0)
     # adaptive_height: True
@@ -1740,6 +1665,7 @@ menu_bar_kv_RL = '''MDBoxLayout:
         md_bg_color: app.theme_cls.bg_light
         size_hint: 0.25, 1.0
 '''
+
 class MenuBarUI(MDApp):
     def __init__(self, panda_app, display_region,id = None):
         super().__init__(panda_app=panda_app, display_region=display_region)
@@ -1770,6 +1696,7 @@ class MenuBarUI(MDApp):
             self.screen.ids.btn4.bind(on_press = lambda _: (open_scene(0), open_scene(self.id-1)))
         else:
             self.screen.ids.btn4.bind(on_press = lambda _:(open_scene(0), open_scene(self.id+1)))
+
 class SurgicalSimulatorBase(GymEnvScene):
     def __init__(self, env_type, env_params):
         super(SurgicalSimulatorBase, self).__init__(env_type, env_params)
@@ -1921,7 +1848,6 @@ class MLP(nn.Module):
     def forward(self, input):
         return self.mlp(input)
 
-
 class DeterministicActor(nn.Module):
     def __init__(self, dimo, dimg, dima, hidden_dim=256):
         super().__init__()
@@ -1967,7 +1893,6 @@ class Normalizer:
         if clip_range is None:
             clip_range = self.default_clip_range
         return np.clip((v - self.mean) / (self.std), -clip_range, clip_range)
-
 
 class SurgicalSimulator(SurgicalSimulatorBase):
     def __init__(self, env_type, env_params,id=None,demo=None):
@@ -2025,7 +1950,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.app.accept('r-up', self.resetEcmFlag)
 
     def get_MTMR_position_action(self,psm1_action,mat=None):
-        # psm_pose_world = np.eye(4)
         if self.id in self.full_dof_list:
             if self.first[1]:
                 for i in range(3):
@@ -2033,24 +1957,13 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                # print('current MTM pos is: ', self.pos_cur)
-                # print('current MTM Matrix is:', self.mr.setpoint_cp().M)
-                # print(f"position is: {self.pos}")
-                # print(f"cur position is: {self.pos_cur}")
-                # for i in range(3):
-                #     if i ==0:
-                #         scaling = -20
-                #     else:
-                #         scaling = 20
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(1000)
                 psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-1000)
                 psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(1000)
-                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
-                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
-            # print("goal orn: ",goal_orn)
+
             for i in range(3):
                 for j in range(3):
                     mat[i][j]= goal_orn[i,j]
@@ -2064,18 +1977,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                # print(f"position is: {self.pos}")
-                # print(f"cur position is: {self.pos_cur}")
-                # for i in range(3):
-                #     if i ==0:
-                #         scaling = -20
-                #     else:
-                #         scaling = 20
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(-500)
                 psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(750)
                 psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(750)
-                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
-                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3]=0
             return psm1_action
@@ -2087,17 +1991,16 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         diff = np.array(target_psm_position) - np.array(current_psm_position)
         distance = np.linalg.norm(diff)    
         print(distance) 
-        force_scale = 1
+        force_scale = 2
         force = np.array([-pid_y(current_psm_position[1]), pid_x(current_psm_position[0]),pid_z(current_psm_position[2]), 0, 0, 0])* force_scale
         self.mr.body.servo_cf(force)        
         
        
-        if distance < 0.01:
+        if distance < 0.05:
             self.new_action_needed = True
             self.mr.body.servo_cf(np.array([0, 0, 0, 0, 0, 0]))
-
+            
     def MTMR2PSM(self,psm1_action,mat=None):
-        # psm_pose_world = np.eye(4)
         if self.id in self.full_dof_list:
             if self.first[1]:
                 for i in range(3):
@@ -2105,24 +2008,12 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                # print('current MTM pos is: ', self.pos_cur)
-                # print('current MTM Matrix is:', self.mr.setpoint_cp().M)
-                # print(f"position is: {self.pos}")
-                # print(f"cur position is: {self.pos_cur}")
-                # for i in range(3):
-                #     if i ==0:
-                #         scaling = -20
-                #     else:
-                #         scaling = 20
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(70)
                 psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-70)
                 psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(70)
-                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
-                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
-            # print("goal orn: ",goal_orn)
             for i in range(3):
                 for j in range(3):
                     mat[i][j]= goal_orn[i,j]
@@ -2136,21 +2027,11 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                # print(f"position is: {self.pos}")
-                # print(f"cur position is: {self.pos_cur}")
-                # for i in range(3):
-                #     if i ==0:
-                #         scaling = -20
-                #     else:
-                #         scaling = 20
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(50)
                 psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-50)
                 psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(50)
-                # if (self.pos_cur[i] - self.pos[i])*1000>0.1:
-                #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3]=0
-            # psm1_action[3] = self.mr.gripper.measured_jp()[0]
             return psm1_action
 
     def _step_simulation_task(self, task):
@@ -2171,12 +2052,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     viewMatrix=self.env._view_matrix,
                     projectionMatrix=self.env._proj_matrix)
                 p.setGravity(0,0,-10.0)
-                # print(f"ecm view out matrix:{self.ecm_view_out}")
                 self.time = task.time
         else:
-            # print("***************************\n")
-            # print("***** Haptic Guidance *****\n")
-            # print("***************************\n")
             if time.time() - self.time > 1/240:
                 try:
                     self.before_simulation_step()
@@ -2187,7 +2064,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 except Exception as e:
                     print(str(e))
    
-
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
                     width=1, height=1,
@@ -2206,7 +2082,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     print('success')
                     return 
 
-                        
         return Task.cont
 
 
@@ -2245,8 +2120,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         file = open('/home/kj/skjsurrol/SurRoL_skj/tests/saved_peg_transfer_action_psm.pkl','rb')
         traj = pickle.load(file)
         file.close()
-        # short_traj = np.array([traj[30]])
-        # print(short_traj)
         return traj
 
     def _preproc_inputs(self, o, g, o_norm, g_norm):
@@ -2269,16 +2142,21 @@ class SurgicalSimulator(SurgicalSimulatorBase):
 
             
         if self.env.ACTION_SIZE != 3 and self.env.ACTION_SIZE != 1:
-
-            # print(f"len of retrieved action:{len(retrived_action)}")
             if self.demo:
+                # goal_position = np.array([2.77531171, 0.00834145, 3.62828469], dtype = np.float32)
+                # diff = goal_position - np.array(self.env._get_robot_state(idx=0)[0:3])
+                # goal_distance = np.linalg.norm(diff)
+                # print(goal_distance)
+                # if goal_distance < 0.1:
+                #     self.target_psm_position = goal_position
+                #     self.pid_x = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[0])
+                #     self.pid_y = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[1])
+                #     self.pid_z = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[2])
+                #     self.move_to_target_psm_forcebased(self.pid_x, self.pid_y, self.pid_z, self.target_psm_position)  
+
                 if self.new_action_needed == True:
                     print('requesting new action')
                     if self.id ==8:
-                        # obs = self.env._get_obs()
-                        # o, g = obs['observation'], obs['desired_goal']
-                        # input_tensor = self._preproc_inputs(o, g, self.o_norm, self.g_norm)
-                        # action = self.actor(input_tensor).data.numpy().flatten()
                         try:
                             action = self.traj[self.traj_idx]
                             self.traj_idx += 1
@@ -2291,8 +2169,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                         obs = self.env._get_obs()
                         action = self.env.get_oracle_action(obs)
                         self.psm1_action = action
-                        # self.env._set_action(self.psm1_action)
-                        # self.env._step_callback()
                     current_psm_position = self.env._get_robot_state(idx=0)[0:3]
                     self.target_psm_position = current_psm_position + self.psm1_action[:3]
                     # distance = np.linalg.norm(self.psm1_action) 
@@ -2300,20 +2176,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.pid_y = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[1])
                     self.pid_z = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[2])
                     self.new_action_needed = False
-                # current_MTM_pose = self.mr.setpoint_cp()
-                # current_MTM_position = np.array([current_MTM_pose.p[i] for i in range(3)])
-                # print('current MTM position is: ', current_MTM_position)
-                # next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
 
-                # next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-45)
-                # next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(45)
-                # next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(45)
-                # next_MTM_pose = PyKDL.Frame()
-                # next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
-                # print('next MTM position is: ', next_MTM_pose.p)
-                # next_MTM_pose.M = current_MTM_pose.M
-                # self.trajectory.append(next_MTM_pose)
-                
                 self.move_to_target_psm_forcebased(self.pid_x, self.pid_y, self.pid_z, self.target_psm_position)
 
                 '''
@@ -2327,7 +2190,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     mat = np.eye(4)
                     retrived_action, mat = self.MTMR2PSM(retrived_action,mat)
                     self.psm1_action = retrived_action
-                    # print("mat is",mat,'psm action is',self.psm1_action)
                     self.env._set_action(self.psm1_action,mat)
                     self.env._step_callback()
                 else:
@@ -2336,8 +2198,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.psm1_action = retrived_action
                     self.env._set_action(self.psm1_action)
                     self.env._step_callback()    
-
-
             else:                   
                 
                 if self.id in self.full_dof_list:
@@ -2345,7 +2205,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     mat = np.eye(4)
                     retrived_action, mat = self.get_MTMR_position_action(retrived_action,mat)
                     self.psm1_action = retrived_action
-                    print("mat is",mat,'psm action is',self.psm1_action)
                     self.env._set_action(self.psm1_action,mat)
                     self.env._step_callback()
                 else:
@@ -2361,12 +2220,10 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             self.ecm_action[0] = -retrived_action[0]*0.2
             self.ecm_action[1] = -retrived_action[1]*0.2
             self.ecm_action[2] = retrived_action[2]*0.2
-        # print(self.id)
         #active track
         if self.id == 27 or self.id == 28:
             self.env._step_callback()
 
-        # self.env._set_action(self.ecm_action)
         if self.demo and (self.env.ACTION_SIZE == 3 or self.env.ACTION_SIZE == 1):
             print('ecm here')
             self.ecm_action = action
@@ -2375,18 +2232,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             print('ecm here')
             self.env._set_action_ecm(self.ecm_action)
         self.env.ecm.render_image()
-        # _,_,rgb,_,_ = p.getCameraImage(
-        #             width=100, height=100,
-        #             viewMatrix=self.env._view_matrix,
-        #             projectionMatrix=self.env._proj_matrix
-        #             )
-        # rgb_array = np.array(rgb, dtype=np.uint8)
-        # if len(rgb_array)>0:
-        #     rgb_array = np.reshape(rgb_array, (100, 100, 4))
-
-        #     rgb_array = rgb_array[:, :, :3]
-
-        #     imageio.imwrite('test.png',rgb_array)
         if self.ecm_view:
             self.env._view_matrix = self.env.ecm.view_matrix
         else:
@@ -2404,7 +2249,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
     def setEcmAction(self, dim, val):
         self.ecm_action[dim] = val
     def resetEcmFlag(self):
-        # print("reset enter")
         self.env._reset_ecm_pos()
     def toggleEcmView(self):
         self.ecm_view = not self.ecm_view
@@ -2415,7 +2259,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         # closeTouch_right()
         self.kivy_ui.stop()
         self.app.win.removeDisplayRegion(self.ui_display_region)
-
 
 class SurgicalSimulatorBimanual(SurgicalSimulatorBase):
     def __init__(self, env_type, env_params, jaw_states=[1.0, 1.0],id=None,demo=None):
@@ -2689,7 +2532,6 @@ class SurgicalSimulatorBimanual(SurgicalSimulatorBase):
         # closeTouch_left()
         self.kivy_ui.stop()
         self.app.win.removeDisplayRegion(self.ui_display_region)
-
 
 # ecm steoro size 1024x768
 app_cfg = ApplicationConfig(window_width=800, window_height=600) #for demo screen, change to 800x600, org 1200x900

@@ -2031,8 +2031,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                print('current MTM pos is: ', self.pos_cur)
-                print('current MTM Matrix is:', self.mr.setpoint_cp().M)
+                # print('current MTM pos is: ', self.pos_cur)
+                # print('current MTM Matrix is:', self.mr.setpoint_cp().M)
                 # print(f"position is: {self.pos}")
                 # print(f"cur position is: {self.pos_cur}")
                 # for i in range(3):
@@ -2048,7 +2048,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
-            print("goal orn: ",goal_orn)
+            # print("goal orn: ",goal_orn)
             for i in range(3):
                 for j in range(3):
                     mat[i][j]= goal_orn[i,j]
@@ -2154,6 +2154,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 #     print(f"variation:{self.pos_cur[i] - self.pos[i]}")
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3]=0
+            # psm1_action[3] = self.mr.gripper.measured_jp()[0]
             return psm1_action
 
     def _step_simulation_task(self, task):
