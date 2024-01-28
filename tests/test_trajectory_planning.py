@@ -73,6 +73,14 @@ app = None
 hint_printed = False
 resetFlag = False
 
+def calculating_potential_from_position(current_position, trajectory):
+    '''
+    1. Calculate the nearest point from the current position to the trajectory
+    2. Determine if the current point is outside the "Tube"
+    3. Point to a few points after the current nearest point if it exists
+    '''
+    
+
 def frame_to_matrix(frame):
     rotation = np.array([[frame.M[0,0], frame.M[0,1], frame.M[0,2]],
                          [frame.M[1,0], frame.M[1,1], frame.M[1,2]],
@@ -2172,9 +2180,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     current_psm_position = self.env._get_robot_state(idx=0)[0:3]
                     self.target_psm_position = current_psm_position + self.psm1_action[:3]
                     # distance = np.linalg.norm(self.psm1_action) 
-                    self.pid_x = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[0])
-                    self.pid_y = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[1])
-                    self.pid_z = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[2])
+                    self.pid_x = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[0], proportional_on_measurement=True)
+                    self.pid_y = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[1], proportional_on_measurement=True)
+                    self.pid_z = PID(5, 0.01, 0.1, setpoint = self.target_psm_position[2], proportional_on_measurement=True)
                     self.new_action_needed = False
 
                 self.move_to_target_psm_forcebased(self.pid_x, self.pid_y, self.pid_z, self.target_psm_position)
