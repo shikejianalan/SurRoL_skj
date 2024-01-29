@@ -2130,16 +2130,20 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         # file = open('/home/kj/skjsurrol/SurRoL_skj/tests/saved_peg_transfer_action_psm.pkl','rb')
         # traj = pickle.load(file)
         # file.close()
-        traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_trajectory.npy')
-        minimum_point = np.argmin(traj[..., 2])
-        print(self.contact_result)
-        if self.contact_result:
-            print('now starting second part')
-            traj = traj[minimum_point:]
-            # exit()
+        if self.id == 8:
+            traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_trajectory.npy')
+            minimum_point = np.argmin(traj[..., 2])
+            print(self.contact_result)
+            if self.contact_result:
+                print('Now starting second part')
+                traj = traj[minimum_point:]
+                # exit()
+            else:
+                print('Start first part trajectory')
+                traj = traj[:minimum_point]
+            return traj
         else:
-            traj = traj[:minimum_point]
-        return traj
+            raise ValueError('Trajectory not implemented')
 
     def _preproc_inputs(self, o, g, o_norm, g_norm):
         o_norm = o_norm.normalize(o)
@@ -2155,7 +2159,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             print('loading policy')
             # self.actor, self.o_norm,self.g_norm = self.load_policy(obs,self.env)
             self.traj = self.load_trajectory()
-            self.traj_idx = 0
             print('policy loaded')
             self.has_load_policy = True
 
@@ -2163,7 +2166,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         if self.env.ACTION_SIZE != 3 and self.env.ACTION_SIZE != 1:
             if self.demo:
                 current_psm_position = self.env._get_robot_state(idx=0)[0:3]
-                target_psm_position, force = trajectory_forward_field_3d(self.traj, current_psm_position, 10, forward_steps=5)
+                target_psm_position, force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=10, forward_steps=5)
                 self.record.append({'current_pos':current_psm_position, 
                                         'target_pos':target_psm_position,
                                         'force':force
@@ -2217,8 +2220,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             self.env._step_callback()
 
         if self.demo and (self.env.ACTION_SIZE == 3 or self.env.ACTION_SIZE == 1):
-            print('ecm here')
-            self.ecm_action = action
+            print('demo ecm here')
+            self.ecm_action = self.psm1_action
             self.env._set_action(self.ecm_action)
         if self.demo is None:
             print('ecm here')
