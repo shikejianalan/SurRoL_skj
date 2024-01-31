@@ -139,15 +139,15 @@ class PegTransferFullDof(PsmEnv):
         # mask=1 # don't collide with any other object
         # p.setCollisionFilterGroupMask(obj_id, 0,group, mask)
         self._pegs = np.arange(12)
-        np.random.shuffle(self._pegs[:6])
-        np.random.shuffle(self._pegs[6: 12])
+        # np.random.shuffle(self._pegs[:6])
+        # np.random.shuffle(self._pegs[6: 12])
         print(self._pegs)
         self._pegs = [2,1,0,3,4,5,9,7,6,11,10,8]
         self._cnt = 0
         # blocks
         num_blocks = 4
         # for i in range(6, 6 + num_blocks):
-        for i in self._pegs[6: 6 + num_blocks]:
+        '''for i in self._pegs[6: 6 + num_blocks]:
             pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
             yaw = (np.random.rand() - 0.5) * np.deg2rad(60)
             obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block_haptic.urdf'),
@@ -163,7 +163,38 @@ class PegTransferFullDof(PsmEnv):
             # change color to red
             p.changeVisualShape(obj_id, -1, rgbaColor=(255 / 255, 69 / 255, 58 / 255, 1))
         self.obj_id, self.obj_link1 = self._blocks[0], -1
-
+''' 
+        self.red_pegs=[7,9,7,7,9,8,10,7,9]
+        # np.random.shuffle(self.red_pegs)
+        for i in self.red_pegs[:1]:
+            pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+            yaw =  np.deg2rad(0)
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block.urdf'),
+                                np.array(pos) + np.array([0, 0, 0.03]),
+                                p.getQuaternionFromEuler((0, 0, yaw)),
+                                useFixedBase=False,
+                                globalScaling=self.SCALING)
+            # print(f"peg obj id: {obj_id}.")
+            self.obj_ids['rigid'].append(obj_id)
+        self._blocks = np.array(self.obj_ids['rigid'][-1:])
+        np.random.shuffle(self._blocks)
+        for obj_id in self._blocks[:1]:
+            # change color to red
+            p.changeVisualShape(obj_id, -1, rgbaColor=(255 / 255, 69 / 255, 58 / 255, 1))
+        self.obj_id, self.obj_link1 = self._blocks[0], 1
+        remain = list(set(self.red_pegs)-set(self.red_pegs[:1]))
+        blue_pegs=[0,3,6,11]+remain
+        # np.random.shuffle(blue_pegs)
+        for i in blue_pegs[:3]:
+            pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+            yaw =  np.deg2rad(0)
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block.urdf'),
+                                np.array(pos) + np.array([0, 0, 0.03]),
+                                p.getQuaternionFromEuler((0, 0, yaw)),
+                                useFixedBase=False,
+                                globalScaling=self.SCALING)
+            # print(f"blue peg obj id: {obj_id}.")
+            self.obj_ids['rigid'].append(obj_id)        
         # self._pegs = [2,1,0,3,4,5,6,7,9,11,10,8]
         # self._pegs = [3,1,4,5,6,8,0,2,7,9,10,11]
         # # blocks
@@ -196,10 +227,17 @@ class PegTransferFullDof(PsmEnv):
             np.abs(achieved_goal[..., -1] - desired_goal[..., -1]) < 4e-3 * self.SCALING
         ).astype(np.float32)
 
+    # def _sample_goal(self) -> np.ndarray:
+    #     """ Samples a new goal and returns it.
+    #     """
+    #     goal = np.array(get_link_pose(self.obj_ids['fixed'][1], self._pegs[0])[0])
+    #     return goal.copy()
+
     def _sample_goal(self) -> np.ndarray:
         """ Samples a new goal and returns it.
         """
-        goal = np.array(get_link_pose(self.obj_ids['fixed'][1], self._pegs[0])[0])
+        goal_id = 1
+        goal = np.array(get_link_pose(self.obj_ids['fixed'][1], goal_id)[0])
         return goal.copy()
 
     def _sample_goal_callback(self):
