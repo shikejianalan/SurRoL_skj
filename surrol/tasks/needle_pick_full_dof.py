@@ -50,7 +50,7 @@ class NeedlePickFullDof(PsmEnv):
 
     def _env_setup(self):
         super(NeedlePickFullDof, self)._env_setup()
-        # np.random.seed(4)  # for experiment reproduce
+        np.random.seed(1024)  # for experiment reproduce
         self.has_object = True
         self._waypoint_goal = True
  

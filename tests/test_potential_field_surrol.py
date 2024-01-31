@@ -134,7 +134,10 @@ def open_scene(id):
         if id ==8:
             scene = SurgicalSimulator(PegTransferFullDof,{'render_mode': 'human'},id,demo=1)
         elif id ==6:
-            scene = SurgicalSimulator(NeedlePickRL,{'render_mode': 'human'},id,demo=1)
+            try:
+                scene = SurgicalSimulator(NeedlePickFullDof,{'render_mode': 'human'},id,demo=1)
+            except Exception as e:
+                print(str(e))
         else:
             if id%2==1:
                 home_every_scene()
@@ -1906,7 +1909,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
     def __init__(self, env_type, env_params,id=None,demo=None):
         super(SurgicalSimulator, self).__init__(env_type, env_params)
         self.id = id
-        self.full_dof_list = [5,7,8,13,19,29,31]
+        self.full_dof_list = [5,6,7,8,13,19,29,31]
         self.path = []
         self.trajectory = []
         self.record = []
@@ -2019,9 +2022,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(80)
-                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-80)
-                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(80)
+                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(100)
+                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-100)
+                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(100)
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
@@ -2051,11 +2054,14 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         if self.demo == None:
             print(f"scene id:{self.id}")
             if task.time - self.time > 1 / 240.0:
-                self.before_simulation_step()
+                try:
+                    self.before_simulation_step()
 
-                # Step simulation
-                p.stepSimulation()
-                self.after_simulation_step()
+                    # Step simulation
+                    p.stepSimulation()
+                    self.after_simulation_step()
+                except Exception as e:
+                    print(str(e))
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2065,6 +2071,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 p.setGravity(0,0,-10.0)
                 self.time = task.time
         else:
+            print(self.id)
             if time.time() - self.time > 1/240:
                 try:
                     self.before_simulation_step()
@@ -2148,6 +2155,19 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 print('Start first part trajectory')
                 traj = traj[:minimum_point]
             return traj
+        elif self.id == 6:
+            traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_needle_pick_position.npy')
+            minimum_point = np.argmin(traj[..., 2])
+            print(self.contact_result)
+            if self.contact_result:
+                print('Now starting second part')
+                traj = traj[minimum_point:]
+
+            else:
+                print('Start first part trajectory')
+                traj = traj[:minimum_point]
+            return traj
+
         else:
             raise ValueError('Trajectory not implemented')
 
@@ -2343,13 +2363,6 @@ class SurgicalSimulatorBimanual(SurgicalSimulatorBase):
             self.first[who] = False
         else:
             self.pos_cur = np.array([self.ml.setpoint_cp().p[i] for i in range(3)]) if who == 0 else np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-            # print(f"position is: {self.pos}")
-            # print(f"cur position is: {self.pos_cur}")
-            # for i in range(3):
-            #     if i ==0:
-            #         scaling = -20
-            #     else:
-            #         scaling = 20
             psm_action[0] = (self.pos_cur[1] - self.pos[who][1])*(1000)
             psm_action[1] = (self.pos_cur[0] - self.pos[who][0])*(-1000)
             psm_action[2] = (self.pos_cur[2] - self.pos[who][2])*(1000)
@@ -2443,21 +2456,7 @@ class SurgicalSimulatorBimanual(SurgicalSimulatorBase):
         if self.demo:
             obs = self.env._get_obs()
             action = self.env.get_oracle_action(obs)
-    
-        # if retrived_action[4] == 2:
-        #     self.psm1_action[0] = 0
-        #     self.psm1_action[1] = 0
-        #     self.psm1_action[2] = 0
-        #     self.psm1_action[3] = 0            
-        # else:
-        #     self.psm1_action[0] = retrived_action[2]*0.7
-        #     self.psm1_action[1] = retrived_action[0]*0.7
-        #     self.psm1_action[2] = retrived_action[1]*0.7
-        #     self.psm1_action[3] = -retrived_action[3]/math.pi*180*0.6
-        # if retrived_action[4] == 0:
-        #     self.psm1_action[4] = 1
-        # if retrived_action[4] == 1:
-        #     self.psm1_action[4] = -0.5
+
         self.psm1_action = retrived_action
 
 
