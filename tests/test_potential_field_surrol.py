@@ -1911,6 +1911,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.trajectory = []
         self.record = []
         self.contact_result = False
+        self.wait_flag = False
+
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2017,9 +2019,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 self.first[1] = False
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(70)
-                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-70)
-                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(70)
+                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(80)
+                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-80)
+                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(80)
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
@@ -2087,7 +2089,8 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
                 wait_list=[12,30]
                 if (self.id not in wait_list and success) or time.time()-self.start_time > 100:   
-                    with open('./position_and_force.pkl', 'wb') as f:
+                    self.mr.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+                    with open('./position_and_force_new.pkl', 'wb') as f:
                         pickle.dump(self.record, f)
                     print('success')
                     return 
@@ -2131,13 +2134,16 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         # traj = pickle.load(file)
         # file.close()
         if self.id == 8:
-            traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_trajectory.npy')
+            traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_peg_transfer_position.npy')
             minimum_point = np.argmin(traj[..., 2])
             print(self.contact_result)
             if self.contact_result:
                 print('Now starting second part')
                 traj = traj[minimum_point:]
                 # exit()
+            # elif self.contact_result and current_psm_position[2] < 3.7:
+            #     traj = np.array([current_psm_position, [current_psm_position[0], current_psm_position[1], 3.7]])
+            #     print(traj)
             else:
                 print('Start first part trajectory')
                 traj = traj[:minimum_point]
@@ -2162,16 +2168,21 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             print('policy loaded')
             self.has_load_policy = True
 
-            
         if self.env.ACTION_SIZE != 3 and self.env.ACTION_SIZE != 1:
             if self.demo:
+                if not self.wait_flag :
+                    self.stanby_time = time.time()
+                    self.wait_flag = True
+                dt = time.time() - self.stanby_time
+                scale = min(dt, 1)
+
                 current_psm_position = self.env._get_robot_state(idx=0)[0:3]
-                target_psm_position, force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=10, forward_steps=5)
+                target_psm_position, force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=12, forward_steps=0)
                 self.record.append({'current_pos':current_psm_position, 
                                         'target_pos':target_psm_position,
                                         'force':force
                                         })
-                self.mr.body.servo_cf(force)
+                self.mr.body.servo_cf(force * scale)
 
                 '''
                 use relative displacement
@@ -2201,7 +2212,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.psm1_action = retrived_action
                     self.env._set_action(self.psm1_action,mat)
                     self.contact_result = self.env._step_callback()
-
+                    print('contact state is:', self.contact_result)
                 else:
                     retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
                     retrived_action = self.get_MTMR_position_action(retrived_action)
