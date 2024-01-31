@@ -119,7 +119,6 @@ class PsmEnv(SurRoLGoalEnv):
         self.psm2 = None
         self._contact_constraint = None
         self._contact_approx = False
-
         p.loadURDF(os.path.join(ASSET_DIR_PATH, 'table/table.urdf'),
                    np.array(self.POSE_TABLE[0]) * self.SCALING,
                    p.getQuaternionFromEuler(self.POSE_TABLE[1]),
@@ -192,11 +191,11 @@ class PsmEnv(SurRoLGoalEnv):
         """
         # assert len(action) == self.ACTION_SIZE, "The action should have the save dim with the ACTION_SIZE"
         # time0 = time.time()
-        print('set action here')
+        # print('set action here')
         action = action.copy()  # ensure that we don't change the action outside of this scope
         action[:3] *= 0.01 * self.SCALING  # position, limit maximum change in position
         pose_world = self.psm1.pose_rcm2world(self.psm1.get_current_position())
-        print(f"~~previous position: {get_pose_2d_from_matrix(pose_world)[0]},orientation: {get_euler_from_matrix(pose_world[:3,:3])}")
+        # print(f"~~previous position: {get_pose_2d_from_matrix(pose_world)[0]},orientation: {get_euler_from_matrix(pose_world[:3,:3])}")
 
         # print(f"pose world before action:{pose_world}")
         workspace_limits = self.workspace_limits1
@@ -222,7 +221,7 @@ class PsmEnv(SurRoLGoalEnv):
         # pose_world[:3, :3] = get_matrix_from_euler(rot)
         # pose_world[:3, :3] = mat[:3,:3]
         # print("pose world rot part:",pose_world[:3,:3])
-        print(f"~~target position:{get_pose_2d_from_matrix(pose_world)[0]},orientation: {get_euler_from_matrix(pose_world[:3,:3])}")
+        # print(f"~~target position:{get_pose_2d_from_matrix(pose_world)[0]},orientation: {get_euler_from_matrix(pose_world[:3,:3])}")
         action_rcm = self.psm1.pose_world2rcm(pose_world) # IMPORTANT
         action_rcm[:3, :3] = mat[:3,:3] # IMPORTANT
         self.psm1.move(action_rcm) # IMPORTANT
@@ -297,8 +296,10 @@ class PsmEnv(SurRoLGoalEnv):
                         childFramePosition=(0, 0, 0),
                         childFrameOrientation=(0, 0, 0))
                     # TODO: check the maxForce; very subtle
-                    print(f'contact with {contact_Id}!create constraint id{self._contact_constraint}!')
+                    print(f'here is in SurRoL_skj: contact with {contact_Id}!create constraint id{self._contact_constraint}!')
                     p.changeConstraint(self._contact_constraint, maxForce=20)
+                    return True
+
         else:
             # self._contact_constraint is not None
             # the gripper grasp the object; to check if they remain contact
