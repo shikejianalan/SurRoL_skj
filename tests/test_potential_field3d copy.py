@@ -78,31 +78,39 @@ curved_trajectory = generate_curved_trajectory(start_point, end_point, curvature
 print(curved_trajectory.shape)
 
 # plot_3d_trajectory_forward_field(curved_trajectory, 0.1, grid_size=10, forward_steps=5)
-
+# /home/kj/skjsurrol/SurRoL_skj/tests/position_and_force_new.pkl
 import pickle
-with open('./position_and_force.pkl', 'rb') as f:
+# with open('./position_and_force_new.pkl', 'rb') as f:
+with open('/home/kj/skjsurrol/SurRoL_skj/tests/position_and_force_new.pkl', 'rb') as f:
     data = pickle.load(f)
-
-print(data)
+# data = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_trajectory.npy')
+# print(data)
 
 current_pos = []
 target_pos = []
 force = []
 
 for idx, i in enumerate(data):
-    
+    # if idx % 2 == 0:
         current_pos.append(i['current_pos'])
         target_pos.append(i['target_pos'])
         force.append(i['force'])
 current_pos = np.array(current_pos)
 target_pos = np.array(target_pos)
+print(target_pos.shape)
+lowest_point_idx = np.argmin(target_pos[:, 2])
+lowest_point = target_pos[lowest_point_idx]
+print(lowest_point)
 force = np.array(force)
 
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
-ax.quiver(current_pos[:, 0], current_pos[:, 1], current_pos[:, 2], force[:, 0], force[:, 1], force[:, 2], color='blue', length = 0.05)
+ax.quiver(current_pos[:, 0], current_pos[:, 1], current_pos[:, 2], force[:, 1], -force[:, 0], force[:, 2], color='blue', length = 0.03)
+ax.scatter(lowest_point[0], lowest_point[1], lowest_point[2], color='red', label='lowest point')
+ax.scatter(lowest_point[0], lowest_point[1], 3.65, color='red', label='lowest point')
 ax.scatter(current_pos[:, 0], current_pos[:, 1], current_pos[:, 2], color='red', linestyle='--', label='current_pos')
-ax.scatter(target_pos[:, 0], target_pos[:, 1], target_pos[:, 2], color='green', linestyle='--', label='target_pos')
+ax.plot(target_pos[:, 0], target_pos[:, 1], target_pos[:, 2], color='darkgreen', linestyle='-', linewidth=5, label='target_pos')
+# ax.plot(data[..., 0], data[..., 1], data[..., 2])
 # ax.plot(force[:, 0], force[:, 1], force[:, 2], color='blue', linestyle='--', label='force')
 ax.set_xlabel('X Axis')
 ax.set_ylabel('Y Axis')

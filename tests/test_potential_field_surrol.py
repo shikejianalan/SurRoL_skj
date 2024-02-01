@@ -2033,7 +2033,6 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     mat[i][j]= goal_orn[i,j]
             return psm1_action, mat
         else:
-            print(self.id)
             if self.first[1]:
                 for i in range(3):
                     psm1_action[i] =0
@@ -2052,7 +2051,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         """Step simulation
         """
         if self.demo == None:
-            print(f"scene id:{self.id}")
+            # print(f"scene id:{self.id}")
             if task.time - self.time > 1 / 240.0:
                 try:
                     self.before_simulation_step()
@@ -2071,7 +2070,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 p.setGravity(0,0,-10.0)
                 self.time = task.time
         else:
-            print(self.id)
+            # print(self.id)
             if time.time() - self.time > 1/240:
                 try:
                     self.before_simulation_step()
@@ -2196,12 +2195,14 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 dt = time.time() - self.stanby_time
                 scale = min(dt, 1)
 
-                current_psm_position = self.env._get_robot_state(idx=0)[0:3]
-                target_psm_position, force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=12, forward_steps=0)
+                current_psm_position = self.env._get_robot_state(idx=0)
+                # print(self.env._get_robot_state(idx=0))
+                (target_psm_position, _), force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=10, forward_steps=3)
                 self.record.append({'current_pos':current_psm_position, 
                                         'target_pos':target_psm_position,
                                         'force':force
                                         })
+                
                 self.mr.body.servo_cf(force * scale)
 
                 '''
