@@ -25,9 +25,11 @@ from surrol.tasks.needle_reach import NeedleReach
 from surrol.tasks.needle_reach_full_dof import NeedleReachFullDof
 
 from surrol.tasks.needle_pick import NeedlePick
+from surrol.tasks.needle_pick_full_dof_haptic import NeedlePickFullDof_haptic
 from surrol.tasks.needle_pick_full_dof import NeedlePickFullDof
 from surrol.tasks.peg_board_full_dof import BiPegBoardFullDof
 from surrol.tasks.peg_transfer import PegTransfer
+from surrol.tasks.peg_transfer_full_dof_haptic import PegTransferFullDof_haptic
 from surrol.tasks.peg_transfer_full_dof import PegTransferFullDof
 
 from surrol.tasks.peg_transfer_RL import PegTransferRL
@@ -60,7 +62,9 @@ import math
 # move in cartesian space
 import PyKDL
 import pickle
-
+from scipy.spatial.transform import Rotation as R
+import threading
+from sensor_msgs.msg import Joy
 from dvrk import mtm
 
 from direct.task import Task
@@ -69,16 +73,14 @@ import pybullet_data
 ######
 from dvrk_control.dvrk_control import *
 from dvrk_control.test_potential_field3d import *
+import sys
+
+random_shuffle = sys.argv[1]
+
 app = None
 hint_printed = False
 resetFlag = False
 
-def calculating_potential_from_position(current_position, trajectory):
-    '''
-    1. Calculate the nearest point from the current position to the trajectory
-    2. Determine if the current point is outside the "Tube"
-    3. Point to a few points after the current nearest point if it exists
-    '''
     
 
 def frame_to_matrix(frame):
@@ -118,7 +120,6 @@ home_every_scene()
 
 def open_scene(id):
     global app, hint_printed,resetFlag
-
     scene = None
     menu_dict = {0:StartPage(),1:ECMPage(),2:NeedlePage(),3:PegPage(),4:PickPlacePage()}
     task_list =[NeedlePickFullDof,PegTransferFullDof,NeedleRegraspFullDof,BiPegTransferFullDof,PickAndPlaceFullDof,BiPegBoardFullDof,NeedleRings,MatchBoardFullDof,ECMReach,MisOrient,StaticTrack,ActiveTrack,NeedleReachFullDof,GauzeRetrieveFullDof]
@@ -132,16 +133,22 @@ def open_scene(id):
         SurgicalSimulatorBimanual(task_list[(id-5)//2], {'render_mode': 'human'}, jaw_states=jaws,id=id,demo=1)
     else:
         if id ==8:
-            scene = SurgicalSimulator(PegTransferFullDof,{'render_mode': 'human'},id,demo=1)
+            scene = SurgicalSimulator(PegTransferFullDof_haptic,{'render_mode': 'human'},id,demo=1)
         elif id ==6:
             try:
-                scene = SurgicalSimulator(NeedlePickFullDof,{'render_mode': 'human'},id,demo=1)
+                scene = SurgicalSimulator(NeedlePickFullDof_haptic,{'render_mode': 'human'},id,demo=1)
             except Exception as e:
                 print(str(e))
         else:
             if id%2==1:
                 home_every_scene()
-                scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id) 
+                if id == 5 and random_shuffle=='fixed':
+                    scene = SurgicalSimulator(NeedlePickFullDof_haptic,{'render_mode': 'human'},id)
+                elif id == 7 and random_shuffle=='fixed':
+                    scene = SurgicalSimulator(PegTransferFullDof_haptic,{'render_mode': 'human'},id) 
+                else: 
+                    scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id) 
+                    
             else:
                 scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id,demo=1)
     if scene:
@@ -1711,9 +1718,31 @@ class MenuBarUI(MDApp):
 class SurgicalSimulatorBase(GymEnvScene):
     def __init__(self, env_type, env_params):
         super(SurgicalSimulatorBase, self).__init__(env_type, env_params)
+        self.clutched = False
     def before_simulation_step(self):
         pass
-
+    
+    # foot pedal callback
+    def coag_event_cb(self,data):
+        # print('~~~',data)
+        # if (data.buttons[0] == 1):
+        #     coag_event.set()
+        #     print('clutched')
+        # else:
+        #     print('not clutched',data.buttons[0])
+        print('clutch status',data.buttons[0])
+        if data.buttons[0] == 1:
+            self.mr.lock_orientation_as_is()
+            self.clutched = True 
+            self.ml.lock_orientation_as_is()
+            # self.left_clutched = True 
+        else:
+            self.mr.unlock_orientation()           
+            self.clutched = False
+            self.ml.unlock_orientation()           
+            # self.left_clutched = False
+        # return data.buttons[0]
+            
     def on_env_created(self):
         """Setup extrnal lights"""
         self.ecm_view_out = self.env._view_matrix
@@ -1802,7 +1831,18 @@ class SurgicalSimulatorBase(GymEnvScene):
         init_orn_r = self.mr.setpoint_cp().M.GetEulerZYX()
         self.orn_r = np.array([init_orn_r[i] for i in range(3)]) # 
         self.orn_cur_r = self.orn_r.copy()
+        # print('self.mr.setpoint_cp().p',self.mr.setpoint_cp().p)
+        # print('self.env._get_robot_state', self.env._get_robot_state(idx=0))
+        # print('pose', self.pos_cur_r)
+        # print('self.orn_r', self.orn_r)
+        # r = R.from_euler('zyx',self.orn_r,degrees=True)
+        # calculate_orientation = r.as_matrix()
+        # print('calculate_orientation', calculate_orientation)
         print(f'mtm setpoint: {self.mr_init_pose}')
+        
+        coag_event = threading.Event()
+        rospy.Subscriber('footpedals/clutch',
+                        Joy, self.coag_event_cb)
 
         # psm_pose_r = self.psm1.get_current_position()
         # psm_measured_cp_r= psm_pose_r.copy()
@@ -1969,6 +2009,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 for i in range(3):
                     psm1_action[i] =0
                 self.first[1] = False
+            elif self.clutched:
+                for i in range(3):
+                    psm1_action[i] =0
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(1000)
@@ -2020,6 +2063,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 for i in range(3):
                     psm1_action[i] =0
                 self.first[1] = False
+            elif self.clutched:
+                for i in range(3):
+                    psm1_action[i] =0
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
                 psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(100)
@@ -2069,6 +2115,20 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     projectionMatrix=self.env._proj_matrix)
                 p.setGravity(0,0,-10.0)
                 self.time = task.time
+
+                obs = self.env._get_obs()
+                obs = self.env._get_obs()['achieved_goal'] if isinstance(obs, dict) else None
+                success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
+                wait_list=[12,30]
+                if (self.id not in wait_list and success) or time.time()-self.start_time > 100:           
+                    open_scene(0)
+                    print(f"xxxx current time:{time.time()}")
+                    open_scene(self.id)
+                    exempt_l = [i for i in range(21,23)]
+                    if self.id not in exempt_l:
+                        self.toggleEcmView()      
+                    print('success')
+                    return 
         else:
             # print(self.id)
             if time.time() - self.time > 1/240:
@@ -2362,6 +2422,9 @@ class SurgicalSimulatorBimanual(SurgicalSimulatorBase):
                 psm_action[i] =0
             psm_action[4] = 1
             self.first[who] = False
+        elif self.clutched:
+            for i in range(3):
+                psm_action[i] =0
         else:
             self.pos_cur = np.array([self.ml.setpoint_cp().p[i] for i in range(3)]) if who == 0 else np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
             psm_action[0] = (self.pos_cur[1] - self.pos[who][1])*(1000)
