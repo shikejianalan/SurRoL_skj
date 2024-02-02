@@ -76,16 +76,16 @@ class NeedleReachFullDof(PsmEnv):
 
         # needle
         yaw = (np.random.rand() - 0.5) * np.pi
-        # obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm.urdf'),
-        #                     (workspace_limits[0].mean() + (np.random.rand() - 0.5) * 0.1,
-        #                      workspace_limits[1].mean() + (np.random.rand() - 0.5) * 0.1,
-        #                      workspace_limits[2][0] + 0.01),
-        #                     p.getQuaternionFromEuler((0, 0, yaw)),
-        #                     useFixedBase=False,
-        #                     globalScaling=self.SCALING)
-        # p.changeVisualShape(obj_id, -1, specularColor=(80, 80, 80))
-        # self.obj_ids['rigid'].append(obj_id)  # 0
-        self.obj_id, self.obj_link1 = self.obj_ids['fixed'][0], -1
+        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'needle/needle_40mm.urdf'),
+                            (workspace_limits[0].mean() + (np.random.rand() - 0.5) * 0.1,
+                             workspace_limits[1].mean() + (np.random.rand() - 0.5) * 0.1,
+                             workspace_limits[2][0] + 0.01),
+                            p.getQuaternionFromEuler((0, 0, yaw)),
+                            useFixedBase=False,
+                            globalScaling=self.SCALING)
+        p.changeVisualShape(obj_id, -1, specularColor=(80, 80, 80))
+        self.obj_ids['rigid'].append(obj_id)  # 0
+        self.obj_id, self.obj_link1 = obj_id, -1
 
         self.m = mtm('MTMR')
 
