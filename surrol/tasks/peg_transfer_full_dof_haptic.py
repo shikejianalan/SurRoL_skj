@@ -15,11 +15,18 @@ from surrol.robots.ecm import RENDER_HEIGHT, RENDER_WIDTH, FoV
 from surrol.const import ASSET_DIR_PATH
 from surrol.robots.ecm import Ecm
 
-import dvrk, rospy, PyKDL
-import time, math
+# load and define the MTM
+import dvrk
+import numpy as np
+import rospy
+import time
+import math
+# move in cartesian space
+import PyKDL
+
 from dvrk import mtm
     
-class PegTransferFullDof(PsmEnv):
+class PegTransferFullDof_haptic(PsmEnv):
     POSE_BOARD = ((0.55, 0, 0.6861), (0, 0, 0))  # 0.675 + 0.011 + 0.001
     WORKSPACE_LIMITS = (0.51, 0.7), (-0.07, 0.07), (0.675, 0.745)
     SCALING = 5.
@@ -32,7 +39,7 @@ class PegTransferFullDof(PsmEnv):
     # TODO: grasp is sometimes not stable; check how to fix it
 
     def __init__(self, render_mode=None, cid = -1):
-        super(PegTransferFullDof, self).__init__(render_mode, cid)
+        super(PegTransferFullDof_haptic, self).__init__(render_mode, cid)
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=(-0.05 * self.SCALING, 0, 0.375 * self.SCALING),
             distance=1.81 * self.SCALING,
@@ -43,9 +50,26 @@ class PegTransferFullDof(PsmEnv):
         )
 
     def _env_setup(self):
-        super(PegTransferFullDof, self)._env_setup()
+        super(PegTransferFullDof_haptic, self)._env_setup()
         self.has_object = True
+        self.m = mtm('MTMR')
 
+        # turn gravity compensation on/off
+        self.m.use_gravity_compensation(True)
+        self.m.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        # # while(1):
+        # print(f'mtm setpoint: {self.m.setpoint_cp()}')
+        # print(f'mtm measured: {self.m.measured_cp()}')
+        # # print(self.m.setpoint_cp())
+        # cp_r = self.m.setpoint_cp().M
+        # cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
+        # # print(f'setpoint rotat {isRotationMatrix(cp_r)}')
+        # # print(f'setpoint rotat to euler{rotationMatrixToEulerAngles(cp_r)}')
+
+        # mcp_r = self.m.measured_cp().M
+        # mcp_r=np.array([[mcp_r[i,0],mcp_r[i,1],mcp_r[i,2]] for i in range(3)])
+        # print(f'measured rotat {isRotationMatrix(mcp_r)}')
+        # print(f'measured rotat to euler {rotationMatrixToEulerAngles(mcp_r)}')
         # camera
         if self._render_mode == 'human':
             reset_camera(yaw=90.0, pitch=-30.0, dist=0.82 * self.SCALING,
@@ -53,28 +77,45 @@ class PegTransferFullDof(PsmEnv):
         self.ecm = Ecm((0.15, 0.0, 0.8524), #p.getQuaternionFromEuler((0, 30 / 180 * np.pi, 0)),
                        scaling=self.SCALING)
         self.ecm.reset_joint(self.QPOS_ECM)
-        
-        #align
-        self.m = mtm('MTMR')
-
-        # turn gravity compensation on/off
-        self.m.use_gravity_compensation(True)
-        self.m.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        # print(f"ECM pose world: {self.ecm.get_current_position_world()}")
+        # ecm_pose = self.ecm.get_current_position()
+        # print(f"ECM pose RCM: {ecm_pose}")
         psm_pose = self.psm1.get_current_position()
-        psm_measured_cp= psm_pose.copy() 
-
+        print(f"PSM pose RCM: {psm_pose}")
+        psm_pose_ori = psm_pose.copy()
+        # psm1_transform= np.array([[  1.0,  0.0,          0.0,         -0.20],
+        #                             [  0.0, -0.866025404,  0.5,          0.0 ],
+        #                             [  0.0, -0.5,         -0.866025404,  0.0 ],
+        #                             [  0.0,  0.0,          0.0,          1.0 ]
+        #                             ])
+        # psm_measured_cp = np.matmul(np.linalg.inv(ecm_pose), psm_pose_ori)#over ecm's rcm
+        psm_measured_cp=psm_pose_ori #not over ecm
+        # psm_measured_cp= np.matmul(psm1_transform,psm_measured_cp) #over ecm,then transform
+        # psm_measured_cp = np.matmul(psm_pose_ori,psm1_transform)
+        print(f"PSM  pose: {psm_measured_cp}")
+        print(f"mtm orientation{self.m.setpoint_cp().M}")
         goal = PyKDL.Frame()
         goal.p = self.m.setpoint_cp().p
+        # # goal.p[0] += 0.05
         goal.M= self.m.setpoint_cp().M
-
+        # # cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
+        # mapping_mat = np.array([[0,1,0,0],
+        #                         [-1,0,0,0],
+        #                         [0,0,1,0],
+        #                         [0,0,0,1]
+        #                         ])
+        # # psm_measured_cp = np.matmul(mapping_mat,psm_measured_cp)
         for i in range(3):
+            print(f"previous goal:{goal.M}")
             for j in range(3):
                 goal.M[i,j]=psm_measured_cp[i][j]
+                # if j==1:
+                #     goal.M[i,j]*=-1
+                # goal.M[i,j]=psm_pose[i][j]
+            print(f"modified goal:{goal.M}")
         print(goal.M.GetEulerZYX())
-
-        self.m.move_cp(goal).wait() 
-
-
+        # print(rotationMatrixToEulerAngles(psm_measured_cp[:3,:3]))
+        self.m.move_cp(goal).wait() #align
         # self.ecm.reset_joint((3.3482885360717773, -0.0017351149581372738, 4.2447919845581055,0))
         # robot
         workspace_limits = (np.asarray(self.WORKSPACE_LIMITS) \
@@ -98,15 +139,15 @@ class PegTransferFullDof(PsmEnv):
         # mask=1 # don't collide with any other object
         # p.setCollisionFilterGroupMask(obj_id, 0,group, mask)
         self._pegs = np.arange(12)
-        np.random.shuffle(self._pegs[:6])
-        np.random.shuffle(self._pegs[6: 12])
+        # np.random.shuffle(self._pegs[:6])
+        # np.random.shuffle(self._pegs[6: 12])
         print(self._pegs)
-        # self._pegs = [2,1,0,3,4,5,9,7,6,11,10,8]
+        self._pegs = [2,1,0,3,4,5,9,7,6,11,10,8]
         self._cnt = 0
         # blocks
         num_blocks = 4
         # for i in range(6, 6 + num_blocks):
-        for i in self._pegs[6: 6 + num_blocks]:
+        '''for i in self._pegs[6: 6 + num_blocks]:
             pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
             yaw = (np.random.rand() - 0.5) * np.deg2rad(60)
             obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block_haptic.urdf'),
@@ -117,12 +158,64 @@ class PegTransferFullDof(PsmEnv):
             print(f"peg obj id: {obj_id}.")
             self.obj_ids['rigid'].append(obj_id)
         self._blocks = np.array(self.obj_ids['rigid'][-num_blocks:])
-        np.random.shuffle(self._blocks)
+        # np.random.shuffle(self._blocks)
         for obj_id in self._blocks[:1]:
             # change color to red
             p.changeVisualShape(obj_id, -1, rgbaColor=(255 / 255, 69 / 255, 58 / 255, 1))
         self.obj_id, self.obj_link1 = self._blocks[0], -1
-
+''' 
+        self.red_pegs=[7,9,7,7,9,8,10,7,9]
+        # np.random.shuffle(self.red_pegs)
+        for i in self.red_pegs[:1]:
+            pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+            yaw =  np.deg2rad(0)
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block.urdf'),
+                                np.array(pos) + np.array([0, 0, 0.03]),
+                                p.getQuaternionFromEuler((0, 0, yaw)),
+                                useFixedBase=False,
+                                globalScaling=self.SCALING)
+            # print(f"peg obj id: {obj_id}.")
+            self.obj_ids['rigid'].append(obj_id)
+        self._blocks = np.array(self.obj_ids['rigid'][-1:])
+        np.random.shuffle(self._blocks)
+        for obj_id in self._blocks[:1]:
+            # change color to red
+            p.changeVisualShape(obj_id, -1, rgbaColor=(255 / 255, 69 / 255, 58 / 255, 1))
+        self.obj_id, self.obj_link1 = self._blocks[0], 1
+        remain = list(set(self.red_pegs)-set(self.red_pegs[:1]))
+        blue_pegs=[0,3,6,11]+remain
+        # np.random.shuffle(blue_pegs)
+        for i in blue_pegs[:3]:
+            pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+            yaw =  np.deg2rad(0)
+            obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block.urdf'),
+                                np.array(pos) + np.array([0, 0, 0.03]),
+                                p.getQuaternionFromEuler((0, 0, yaw)),
+                                useFixedBase=False,
+                                globalScaling=self.SCALING)
+            # print(f"blue peg obj id: {obj_id}.")
+            self.obj_ids['rigid'].append(obj_id)        
+        # self._pegs = [2,1,0,3,4,5,6,7,9,11,10,8]
+        # self._pegs = [3,1,4,5,6,8,0,2,7,9,10,11]
+        # # blocks
+        # num_blocks = 6
+        # # for i in range(6, 6 + num_blocks):
+        # for i in self._pegs[6: 6 + num_blocks]:
+        #     pos, orn = get_link_pose(self.obj_ids['fixed'][1], i)
+        #     yaw = (np.random.rand() - 0.5) * np.deg2rad(60)
+        #     obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'block/block_haptic.urdf'),
+        #                         np.array(pos) + np.array([0, 0, 0.03]),
+        #                         p.getQuaternionFromEuler((0, 0, yaw)),
+        #                         useFixedBase=False,
+        #                         globalScaling=self.SCALING)
+        #     print(f"peg obj id: {obj_id}.")
+        #     self.obj_ids['rigid'].append(obj_id)
+        # self._blocks = np.array(self.obj_ids['rigid'][-num_blocks:])
+        # # np.random.shuffle(self._blocks)
+        # for obj_id in self._blocks[:3]:
+        #     # change color to red
+        #     p.changeVisualShape(obj_id, -1, rgbaColor=(255 / 255, 69 / 255, 58 / 255, 1))
+        # self.obj_id, self.obj_link1 = self._blocks[2], -1
         print(self.obj_ids['fixed'])
         print(f'goal peg:{obj_id}')
     def _is_success(self, achieved_goal, desired_goal):
@@ -134,10 +227,17 @@ class PegTransferFullDof(PsmEnv):
             np.abs(achieved_goal[..., -1] - desired_goal[..., -1]) < 4e-3 * self.SCALING
         ).astype(np.float32)
 
+    # def _sample_goal(self) -> np.ndarray:
+    #     """ Samples a new goal and returns it.
+    #     """
+    #     goal = np.array(get_link_pose(self.obj_ids['fixed'][1], self._pegs[0])[0])
+    #     return goal.copy()
+
     def _sample_goal(self) -> np.ndarray:
         """ Samples a new goal and returns it.
         """
-        goal = np.array(get_link_pose(self.obj_ids['fixed'][1], self._pegs[0])[0])
+        goal_id = 1
+        goal = np.array(get_link_pose(self.obj_ids['fixed'][1], goal_id)[0])
         return goal.copy()
 
     def _sample_goal_callback(self):
@@ -229,9 +329,57 @@ class PegTransferFullDof(PsmEnv):
         
     def _reset_ecm_pos(self):
         self.ecm.reset_joint(self.QPOS_ECM)
+# def isRotationMatrix(R):
+#     Rt = np.transpose(R)
+#     shouldBeIdentity = np.dot(Rt, R)
+#     I = np.identity(3, dtype=R.dtype)
+#     n = np.linalg.norm(I - shouldBeIdentity)
+#     return n < 1e-6
 
+# # Calculates rotation matrix to euler angles
+# # The result is the same as MATLAB except the order
+# # of the euler angles ( x and z are swapped ).
+
+
+# def rotationMatrixToEulerAngles(R):
+
+#     assert (isRotationMatrix(R))
+
+#     sy = math.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+
+#     singular = sy < 1e-6
+
+#     if not singular:
+#         x = math.atan2(R[2, 1], R[2, 2])
+#         y = math.atan2(-R[2, 0], sy)
+#         z = math.atan2(R[1, 0], R[0, 0])
+#     else:
+#         x = math.atan2(-R[1, 2], R[1, 1])
+#         y = math.atan2(-R[2, 0], sy)
+#         z = 0
+
+#     return np.array([x, y, z])
 if __name__ == "__main__":
-    env = PegTransferFullDof(render_mode='human')  # create one process and corresponding env
+    env = PegTransferFullDof_haptic(render_mode='human')  # create one process and corresponding env
+
+    # m = dvrk.mtm('MTMR')
+
+    # # turn gravity compensation on/off
+    # m.use_gravity_compensation(True)
+    # m.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+    # # while(1):
+    # print(f'mtm setpoint: {m.setpoint_cp()}')
+    # print(f'mtm measured: {m.measured_cp()}')
+    # # print(m.setpoint_cp())
+    # cp_r = m.setpoint_cp().M
+    # cp_r=np.array([[cp_r[i,0],cp_r[i,1],cp_r[i,2]] for i in range(3)])
+    # print(f'setpoint rotat {isRotationMatrix(cp_r)}')
+    # print(f'setpoint rotat to euler{rotationMatrixToEulerAngles(cp_r)}')
+
+    # mcp_r = m.measured_cp().M
+    # mcp_r=np.array([[mcp_r[i,0],mcp_r[i,1],mcp_r[i,2]] for i in range(3)])
+    # print(f'measured rotat {isRotationMatrix(mcp_r)}')
+    # print(f'measured rotat to euler {rotationMatrixToEulerAngles(mcp_r)}')
 
     env.test()
     env.close()

@@ -27,7 +27,7 @@ import math
 import PyKDL
 
 from dvrk import mtm
-class NeedlePickFullDof(PsmEnv):
+class NeedlePickFullDof_haptic(PsmEnv):
     POSE_TRAY = ((0.55, 0, 0.6751), (0, 0, 0))
     WORKSPACE_LIMITS = ((0.50, 0.60), (-0.05, 0.05), (0.695, 0.745))  # reduce tip pad contact
     SCALING = 5.
@@ -37,7 +37,7 @@ class NeedlePickFullDof(PsmEnv):
 
     # TODO: grasp is sometimes not stable; check how to fix it
     def __init__(self, render_mode=None, cid = -1):
-        super(NeedlePickFullDof, self).__init__(render_mode, cid)
+        super(NeedlePickFullDof_haptic, self).__init__(render_mode, cid)
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=(-0.05 * self.SCALING, 0, 0.375 * self.SCALING),
             distance=1.81 * self.SCALING,
@@ -49,8 +49,8 @@ class NeedlePickFullDof(PsmEnv):
 
 
     def _env_setup(self):
-        super(NeedlePickFullDof, self)._env_setup()
-        # np.random.seed(1024)  # for experiment reproduce
+        super(NeedlePickFullDof_haptic, self)._env_setup()
+        np.random.seed(1024)  # for experiment reproduce
         self.has_object = True
         self._waypoint_goal = True
  
@@ -219,7 +219,7 @@ class NeedlePickFullDof(PsmEnv):
 
 
 if __name__ == "__main__":
-    env = NeedlePickFullDof(render_mode='human')  # create one process and corresponding env
+    env = NeedlePickFullDof_haptic(render_mode='human')  # create one process and corresponding env
 
     env.test()
     env.close()
