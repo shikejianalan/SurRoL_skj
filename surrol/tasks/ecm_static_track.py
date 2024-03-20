@@ -93,7 +93,7 @@ class StaticTrack(EcmEnv):
         ])
 
         observation = np.concatenate([
-            robot_state, np.array(in_view).astype(np.float).ravel(),
+            robot_state, np.array(in_view).astype(np.float32).ravel(),
             centroids.ravel(), np.array(self.ecm.wz).ravel()  # achieved_goal.copy(),
         ])
         obs = {

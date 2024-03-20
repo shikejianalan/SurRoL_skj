@@ -130,6 +130,8 @@ def open_scene(id):
                 scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id) 
             else:
                 scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id,demo=1)
+    print(scene)
+
     # if id == 0:
     #     scene = StartPage()
     # elif id == 1:
@@ -1971,7 +1973,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
     def __init__(self, env_type, env_params,id=None,demo=None):
         super(SurgicalSimulator, self).__init__(env_type, env_params)
         self.id = id
-        self.full_dof_list = [5,7,13,19,29,31]
+        self.full_dof_list = [5,7,13,19,29,31,32]
         self.path = []
         self.trajectory = []
         # initTouch_right()
@@ -2136,14 +2138,15 @@ class SurgicalSimulator(SurgicalSimulatorBase):
     def _step_simulation_task(self, task):
         """Step simulation
         """
-        if self.demo == None:
-            print(f"scene id:{self.id}")
-            if task.time - self.time > 1 / 240.0:
-                self.before_simulation_step()
+        if task.time - self.time > 1 / 240.0:
+                try:
+                    self.before_simulation_step()
 
-                # Step simulation
-                p.stepSimulation()
-                self.after_simulation_step()
+                    # Step simulation
+                    p.stepSimulation()
+                    self.after_simulation_step()
+                except Exception as e:
+                    print(str(e))
 
                 # Call trigger update scene (if necessary) and draw methods
                 p.getCameraImage(
@@ -2151,8 +2154,25 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     viewMatrix=self.env._view_matrix,
                     projectionMatrix=self.env._proj_matrix)
                 p.setGravity(0,0,-10.0)
-                # print(f"ecm view out matrix:{self.ecm_view_out}")
                 self.time = task.time
+
+                obs = self.env._get_obs()
+                obs = self.env._get_obs()['achieved_goal'] if isinstance(obs, dict) else None
+                success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
+                wait_list=[12,30]
+                if (self.id not in wait_list and success) or time.time()-self.start_time > 100:           
+                    open_scene(0)
+                    print(f"xxxx current time:{time.time()}")
+                    open_scene(self.id)
+                    exempt_l = [i for i in range(21,23)]
+                    if self.id not in exempt_l:
+                        self.toggleEcmView()      
+                    # try:
+                    #     np.save('absolute_gauzz_retrieve_position.npy', self.trajectory)
+                    # except Exception as e:
+                    #     print(str(e))
+                    print('success')
+                    return 
         else:
             # print("***************************\n")
             # print("***** Haptic Guidance *****\n")
@@ -2206,13 +2226,10 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     # if self.id not in exempt_l:
                     #     self.toggleEcmView()
                     # self.cnt+=1
-                    try:
-                        import pickle
-                        with open('./saved_peg_transfer_action_psm.pkl', 'wb') as f:
-                            pickle.dump(self.trajectory, f)
-                        print(len(self.trajectory))
-                    except Exception as e:
-                        print(str(e))
+                    # try:
+                    #     np.save('absolute_gauzz_retrieve_position.npy', self.trajectory)
+                    # except Exception as e:
+                    #     print(str(e))
                     print('success')
                     return 
                     # self.start_time=time.time()
@@ -2302,14 +2319,17 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     o, g = obs['observation'], obs['desired_goal']
                     input_tensor = self._preproc_inputs(o, g, self.o_norm, self.g_norm)
                     action = self.actor(input_tensor).data.numpy().flatten()
-                    self.trajectory.append(action)
                     # print(f"retrieved action is: {self.psm1_action}")
                     self.psm1_action = action
+                    retrived_action = self.psm1_action
                     self.env._set_action(self.psm1_action)
                 else:
                     obs = self.env._get_obs()
                     action = self.env.get_oracle_action(obs)
                     self.psm1_action = action
+                    current_psm_pose = self.env._get_robot_state(idx=0)
+                    self.trajectory.append(current_psm_pose)
+                    retrived_action = self.psm1_action
                     self.env._set_action(self.psm1_action)
                     self.env._step_callback()
                 
@@ -2319,9 +2339,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 print('current MTM position is: ', current_MTM_position)
                 next_MTM_position = np.array([0, 0, 0], dtype = np.float32)
 
-                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-45)
-                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(45)
-                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(45)
+                next_MTM_position[0] = current_MTM_position[0] + self.psm1_action[1]/(-50)
+                next_MTM_position[1] = current_MTM_position[1] + self.psm1_action[0]/(50)
+                next_MTM_position[2] = current_MTM_position[2] + self.psm1_action[2]/(50)
                 next_MTM_pose = PyKDL.Frame()
                 next_MTM_pose.p = PyKDL.Vector(next_MTM_position[0], next_MTM_position[1], next_MTM_position[2])
                 print('next MTM position is: ', next_MTM_pose.p)
@@ -2334,19 +2354,19 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 Update PSM using MTM position
                 '''
 
-                if self.id in self.full_dof_list:
-                    retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
-                    mat = np.eye(4)
-                    retrived_action, mat = self.MTMR2PSM(retrived_action,mat)
-                    self.psm1_action = retrived_action
-                    print("mat is",mat,'psm action is',self.psm1_action)
-                    # self.env._set_action(self.psm1_action,mat)
-                    # self.env._step_callback()
-                else:
-                    retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
-                    retrived_action = self.MTMR2PSM(retrived_action)
-                    self.psm1_action = retrived_action
-                    # self.env._set_action(self.psm1_action)
+                # if self.id in self.full_dof_list:
+                #     retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
+                #     mat = np.eye(4)
+                #     retrived_action, mat = self.MTMR2PSM(retrived_action,mat)
+                #     self.psm1_action = retrived_action
+                #     print("mat is",mat,'psm action is',self.psm1_action)
+                #     # self.env._set_action(self.psm1_action,mat)
+                #     # self.env._step_callback()
+                # else:
+                #     retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
+                #     retrived_action = self.MTMR2PSM(retrived_action)
+                #     self.psm1_action = retrived_action
+                #     # self.env._set_action(self.psm1_action)
 
 
             else:                   
@@ -2357,12 +2377,16 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     retrived_action, mat = self.get_MTMR_position_action(retrived_action,mat)
                     self.psm1_action = retrived_action
                     print("mat is",mat,'psm action is',self.psm1_action)
+                    current_psm_pose = self.env._get_robot_state(idx=0)
+                    self.trajectory.append(current_psm_pose)
                     self.env._set_action(self.psm1_action,mat)
                     self.env._step_callback()
                 else:
                     retrived_action = np.array([0, 0, 0, 0, 0], dtype = np.float32)
                     retrived_action = self.get_MTMR_position_action(retrived_action)
                     self.psm1_action = retrived_action
+                    current_psm_pose = self.env._get_robot_state(idx=0)
+                    self.trajectory.append(current_psm_pose)
                     self.env._set_action(self.psm1_action)
                     self.env._step_callback()
         

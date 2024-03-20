@@ -12,6 +12,12 @@ from panda3d.core import AmbientLight, DirectionalLight, Spotlight, PerspectiveL
 import math
 import imageio
 import time
+import sys
+
+
+random_shuffle = sys.argv[1] # default: fixed
+user_name = sys.argv[2]
+test_name = sys.argv[3]
 
 from surrol.gui.scene import Scene, GymEnvScene
 from surrol.gui.application import Application, ApplicationConfig
@@ -20,17 +26,39 @@ from surrol.tasks.ecm_reach import ECMReach
 from surrol.tasks.ecm_active_track import ActiveTrack
 from surrol.tasks.ecm_static_track import StaticTrack
 from surrol.tasks.gauze_retrieve import GauzeRetrieve
-from surrol.tasks.gauze_retrieve_full_dof import GauzeRetrieveFullDof
+from surrol.tasks.gauze_retrieve_full_dof import GauzeRetrieveFullDof   
+if test_name == 'test1':
+    from surrol.tasks.gauze_retrieve_full_dof_test1 import GauzeRetrieveFullDof_fixed
+elif test_name == 'test2':
+    from surrol.tasks.gauze_retrieve_full_dof_test2 import GauzeRetrieveFullDof_fixed
+elif test_name == 'test3':
+    from surrol.tasks.gauze_retrieve_full_dof_test3 import GauzeRetrieveFullDof_fixed   
+from surrol.tasks.gauze_retrieve_full_dof_haptic import GauzeRetrieveFullDof_haptic
+    
 from surrol.tasks.needle_reach import NeedleReach
 from surrol.tasks.needle_reach_full_dof import NeedleReachFullDof
+if test_name == 'test1':
+    from surrol.tasks.needle_reach_full_dof_test1 import NeedleReachFullDof_fixed
+elif test_name == 'test2':
+    from surrol.tasks.needle_reach_full_dof_test2 import NeedleReachFullDof_fixed
+elif test_name == 'test3':
+    from surrol.tasks.needle_reach_full_dof_test3 import NeedleReachFullDof_fixed
 
-from surrol.tasks.needle_pick import NeedlePick
+
 from surrol.tasks.needle_pick_full_dof_haptic import NeedlePickFullDof_haptic
+# from surrol.tasks.needle_pick import NeedlePick
 from surrol.tasks.needle_pick_full_dof import NeedlePickFullDof
 from surrol.tasks.peg_board_full_dof import BiPegBoardFullDof
-from surrol.tasks.peg_transfer import PegTransfer
+# from surrol.tasks.peg_transfer import PegTransfer
 from surrol.tasks.peg_transfer_full_dof_haptic import PegTransferFullDof_haptic
+
 from surrol.tasks.peg_transfer_full_dof import PegTransferFullDof
+if test_name == 'test1':
+    from surrol.tasks.peg_transfer_full_dof_test1 import PegTransferFullDof_fixed
+elif test_name == 'test2':
+    from surrol.tasks.peg_transfer_full_dof_test2 import PegTransferFullDof_fixed
+elif test_name == 'test3':
+    from surrol.tasks.peg_transfer_full_dof_test3 import PegTransferFullDof_fixed
 
 from surrol.tasks.peg_transfer_RL import PegTransferRL
 from surrol.tasks.needle_regrasp_bimanual import NeedleRegrasp
@@ -73,14 +101,15 @@ import pybullet_data
 ######
 from dvrk_control.dvrk_control import *
 from dvrk_control.test_potential_field3d import *
-import sys
 
-random_shuffle = sys.argv[1]
 
 app = None
 hint_printed = False
 resetFlag = False
+cnt = 0
+cntt = 0
 
+random_seed = 1024
     
 
 def frame_to_matrix(frame):
@@ -139,14 +168,21 @@ def open_scene(id):
                 scene = SurgicalSimulator(NeedlePickFullDof_haptic,{'render_mode': 'human'},id,demo=1)
             except Exception as e:
                 print(str(e))
+        elif id == 32:
+            scene = SurgicalSimulator(GauzeRetrieveFullDof_haptic,{'render_mode': 'human'},id,demo=1)
         else:
             print(id)
             if id%2==1:
                 home_every_scene()
                 if id == 5 and random_shuffle=='fixed':
                     scene = SurgicalSimulator(NeedlePickFullDof_haptic,{'render_mode': 'human'},id)
+                    
                 elif id == 7 and random_shuffle=='fixed':
-                    scene = SurgicalSimulator(PegTransferFullDof_haptic,{'render_mode': 'human'},id) 
+                    scene = SurgicalSimulator(PegTransferFullDof_fixed,{'render_mode': 'human'},id) 
+                elif id == 31 and random_shuffle=='fixed':
+                    scene = SurgicalSimulator(GauzeRetrieveFullDof_fixed,{'render_mode': 'human'},id) 
+                elif id == 29 and random_shuffle == 'fixed':
+                    scene = SurgicalSimulator(NeedleReachFullDof_fixed,{'render_mode': 'human'},id) 
                 else: 
                     try:
                         scene = SurgicalSimulator(task_list[(id-5)//2],{'render_mode': 'human'},id)
@@ -1964,7 +2000,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
         self.record = []
         self.contact_result = False
         self.wait_flag = False
-
+        self.overall_distance = 0
+        self.first_waypoint = True
+        
         # initTouch_right()
         # startScheduler()
         if env_type.ACTION_SIZE != 3 and env_type.ACTION_SIZE != 1:
@@ -2077,9 +2115,9 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     psm1_action[i] =0
             else:
                 self.pos_cur = np.array([self.mr.setpoint_cp().p[i] for i in range(3)])
-                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(100)
-                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-100)
-                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(100)
+                psm1_action[0] = (self.pos_cur[1] - self.pos[1][1])*(80)
+                psm1_action[1] = (self.pos_cur[0] - self.pos[1][0])*(-80)
+                psm1_action[2] = (self.pos_cur[2] - self.pos[1][2])*(80)
                 self.pos[1] = self.pos_cur.copy()
             psm1_action[3] = self.mr.gripper.measured_jp()[0]
             goal_orn = self.mr.setpoint_cp().M
@@ -2128,18 +2166,47 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 obs = self.env._get_obs()
                 obs = self.env._get_obs()['achieved_goal'] if isinstance(obs, dict) else None
                 success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
-                wait_list=[12,30]
-                if (self.id not in wait_list and success) or time.time()-self.start_time > 100:           
+                wait_list=[12]
+                global cnt
+                if success: 
+                    cnt += 1
+                if (self.id not in wait_list and success) or time.time()-self.start_time > 100:      
+                    total_distance = 0
+                    for idx, items in enumerate(self.record):
+                        if idx == 0:
+                            previous_position = items['current_pos']
+                        current_position = items['current_pos']
+                        total_distance += np.linalg.norm(current_position[:3] - previous_position[:3])
+                        previous_position = current_position
+                    print('the overall distance is: ', total_distance)
+
                     open_scene(0)
                     print(f"xxxx current time:{time.time()}")
                     open_scene(self.id)
                     exempt_l = [i for i in range(21,23)]
                     if self.id not in exempt_l:
-                        self.toggleEcmView()      
+                        self.toggleEcmView()
+                    if self.id == 7:
+                        task_name = 'peg_transfer_'
+                    elif self.id == 29:
+                        task_name = 'needle_reach_'
+                    elif self.id ==31:
+                        task_name = 'gauze_retrive_'
+                    count = str(cnt)
+                    directory = f'./record/{user_name}/'
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                        print(f"Directory '{directory}' created.")
+                    else:
+                        print(f"Directory '{directory}' already exists.")
+                    with open(directory + task_name + user_name +'_'+test_name+'_'+ count +'.pkl', 'wb') as f:
+                        pickle.dump(self.record, f)      
+                    with open(directory + task_name + user_name +'_'+test_name+'_'+ count +'.txt', 'a') as txt_file:
+                        txt_file.write('the final distance is: ', total_distance + '\n')
                     print('success')
                     return 
         else:
-            # print(self.id)
+            # print('999999999999999999999',self.id)
             if time.time() - self.time > 1/240:
                 try:
                     self.before_simulation_step()
@@ -2163,10 +2230,33 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 obs = self.env._get_obs()['achieved_goal'] if isinstance(obs, dict) else None
                 success = self.env._is_success(obs,self.env._sample_goal()) if obs is not None else False
                 wait_list=[12]
+                global cntt
+                if success: 
+                    cntt += 1
                 if (self.id not in wait_list and success) or time.time()-self.start_time > 100:   
                     self.mr.body.servo_cf(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-                    with open('./record/demo_record_xxx.pkl', 'wb') as f:
+
+                    if self.id == 8:
+                        task_name = 'peg_transfer_'
+                    elif self.id == 30:
+                        task_name = 'needle_reach_'
+                    elif self.id ==32:
+                        task_name = 'gauze_retrive_'
+                    count = str(cntt)
+                    # with open('./record/demo_record_'+ task_name + user_name +'_'+ count +'.pkl', 'wb') as f:
+                    with open('./record/demo_record_'+ task_name + user_name + '.pkl', 'wb') as f:
                         pickle.dump(self.record, f)
+                    total_distance = 0
+                    for idx, items in enumerate(self.record):
+                        if idx == 0:
+                            previous_position = items['current_pos']
+                        current_position = items['current_pos']
+                        total_distance += np.linalg.norm(current_position[:3] - previous_position[:3])
+                        previous_position = current_position
+                    print('the overall distance is: ', total_distance)
+                    # with open('./record/demo_record_'+ task_name + user_name + '.txt', 'wb') as txt_file:
+                    #     txt.write('the final distance is: ', total_distance + '\n')
+                    #     txt.write('the overall distance is: ', self.overall_distance + '\n')
                     print('success')
                     return 
 
@@ -2225,6 +2315,20 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             return traj
         elif self.id == 6 or self.id == 32:
             traj = np.load('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_needle_pick_position.npy')
+            # current_psm_position = self.env._get_robot_state(idx=0)
+            # print(current_psm_position, traj[0])
+            # initial_point = traj[0][:3]
+            # diff = initial_point - current_psm_position[:3]
+            # print(diff)
+            # exit()
+            # step = diff / 10
+            # initial_traj = []
+            # for i in range(11):
+            #     new_position = current_psm_position + [i * step[0], i * step[1],i * step[2],0,0,0,0]
+            #     initial_traj.append(np.array(new_position))
+            # traj = np.stack(initial_traj, traj)
+            # print(initial_traj.shape)
+            # exit()
             minimum_point = np.argmin(traj[..., 2])
             print(self.contact_result)
             if self.contact_result:
@@ -2245,6 +2349,7 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                 new_position = current_psm_position + [i * step[0], i * step[1],i * step[2],0,0,0,0]
                 traj.append(np.array(new_position))
             print(traj)
+            np.save('/home/kj/skjsurrol/SurRoL_skj/tests/absolute_needle_reach_position.npy', np.array(traj))
             return np.array(traj)
         else:
             raise ValueError('Trajectory not implemented')
@@ -2273,13 +2378,21 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.wait_flag = True
                 dt = time.time() - self.stanby_time
                 scale = min(dt, 1)
-
+                if self.first_waypoint:
+                    self.previous_psm_position = self.env._get_robot_state(idx=0)[:3]
+                    self.first_waypoint = False
                 current_psm_position = self.env._get_robot_state(idx=0)
+                step_distance = np.linalg.norm(current_psm_position[:3] - self.previous_psm_position)
+                self.overall_distance += step_distance
+                print('Overall_distance now is: ', self.overall_distance)
+                self.previous_psm_position = current_psm_position[:3]
                 # print(self.env._get_robot_state(idx=0))
-                (target_psm_position, _), force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=10, forward_steps=1)
+                (target_psm_position, distance), force = trajectory_forward_field_3d(self.traj, current_psm_position, k_att=10, forward_steps=3)
+                
                 self.record.append({'current_pos':current_psm_position, 
                                         'target_pos':target_psm_position,
-                                        'force':force
+                                        'force':force,
+                                        'distance':distance
                                         })
                 
                 self.mr.body.servo_cf(force * scale)
@@ -2303,8 +2416,32 @@ class SurgicalSimulator(SurgicalSimulatorBase):
                     self.psm1_action = retrived_action
                     self.env._set_action(self.psm1_action)
                     self.contact_result = self.env._step_callback()
-            else:                   
-                
+            else: 
+                if self.first_waypoint:
+                    self.previous_psm_position = self.env._get_robot_state(idx=0)[:3]
+                    self.first_waypoint = False
+                current_psm_position = self.env._get_robot_state(idx=0)
+                step_distance = np.linalg.norm(current_psm_position[:3] - self.previous_psm_position)
+                self.overall_distance += step_distance
+                self.previous_psm_position = current_psm_position[:3]
+                print('Overall_distance now is: ', self.overall_distance)     
+                if self.id == 7:
+                        task_name = 'peg_transfer_'
+                elif self.id == 29:
+                    task_name = 'needle_reach_'
+                elif self.id ==31:
+                    task_name = 'gauze_retrive_'
+                directory = f'./record/{user_name}/'
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                    print(f"Directory '{directory}' created.")
+                          
+                with open(directory + task_name + user_name +'_'+test_name+'_'+ str(cnt) +'.txt', 'a') as txt_file:                
+                    txt_file.write('the overall distance is: '+ str(self.overall_distance) + '\n')
+
+                current_psm_position = self.env._get_robot_state(idx=0)
+                self.record.append({'current_pos':current_psm_position, 
+                                        })               
                 if self.id in self.full_dof_list:
                     retrived_action= np.array([0, 0, 0, 0], dtype = np.float32)
                     mat = np.eye(4)
@@ -2331,11 +2468,11 @@ class SurgicalSimulator(SurgicalSimulatorBase):
             self.env._step_callback()
 
         if self.demo and (self.env.ACTION_SIZE == 3 or self.env.ACTION_SIZE == 1):
-            print('demo ecm here')
+            # print('demo ecm here')
             self.ecm_action = self.psm1_action
             self.env._set_action(self.ecm_action)
         if self.demo is None:
-            print('ecm here')
+            # print('ecm here')
             self.env._set_action_ecm(self.ecm_action)
         self.env.ecm.render_image()
         if self.ecm_view:

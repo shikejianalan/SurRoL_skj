@@ -45,16 +45,18 @@ def trajectory_forward_field_3d(trajectory, position, k_att, forward_steps=5):
     angular_x = 0
     angular_y = 0
     angular_z = 0
-        
-    if len(trajectory)-1-forward_index < 3 and distances < 0.1:
-        angle_diff = np.linalg.norm(trajectory[forward_index][3:6]- trajectory[-1][3:6])
-        print(angle_diff)
-        if angle_diff > 0.01:
-            angular_x = min(0.1 * (forward_point[3] - p[3]), 0.01)
-            angular_y = min(0.1 * (forward_point[4] - p[4]), 0.01)
-            angular_z = min(0.1 * (forward_point[5] - p[5]), 0.01)
-        
+    distance_to_final = np.linalg.norm(trajectory[-1, 0:3] - p[0:3])
+    if forward_index == len(trajectory) and distance_to_final < 0.05:
+        grad_y, grad_x, grad_z = 0,0,0
+    # if len(trajectory)-1-forward_index < 3 and distances < 0.3:
+    #     angle_diff = np.linalg.norm(p[3:6]- trajectory[-1][3:6])
+    #     print('angle_diff', angle_diff)
+    #     if angle_diff > 0.5:
+    #         angular_x = min(0.05 * (forward_point[3] - p[3]), 0.01)
+    #         angular_y = min(0.05 * (forward_point[4] - p[4]), 0.01)
+    #         angular_z = min(0.05 * (forward_point[5] - p[5]), 0.01)
+   
     force = np.array([-grad_y, grad_x, grad_z, angular_x, angular_y, angular_z])
-    return (forward_point, forward_index), force
+    return (forward_point, distances), force
 
 

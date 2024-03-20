@@ -45,7 +45,7 @@ class NeedleReachFullDof(PsmEnv):
     def _env_setup(self):
         super(NeedleReachFullDof, self)._env_setup()
         self.has_object = False
-
+        # np.random.seed(int(1024))  # for experiment reproduce
         # camera
         if self._render_mode == 'human':
             # reset_camera(yaw=90.0, pitch=-30.0, dist=0.82 * self.SCALING,

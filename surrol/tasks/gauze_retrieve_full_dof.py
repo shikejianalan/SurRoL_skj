@@ -58,6 +58,10 @@ class GauzeRetrieveFullDof(PsmEnv):
         self.ecm.reset_joint(self.QPOS_ECM)
 
     def _env_setup(self):
+        ############################
+        ### change it manually!!!!!!
+        ############################
+        # np.random.seed(2048)
         super(GauzeRetrieveFullDof, self)._env_setup()
         self.has_object = True
         self._waypoint_goal = True
@@ -74,7 +78,7 @@ class GauzeRetrieveFullDof(PsmEnv):
         self.block_gripper = False
 
         # tray pad
-        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'tray/tray.urdf'),
+        obj_id = p.loadURDF(os.path.join(ASSET_DIR_PATH, 'tray/tray_pad.urdf'),
                             np.array(self.POSE_TRAY[0]) * self.SCALING,
                             p.getQuaternionFromEuler(self.POSE_TRAY[1]),
                             globalScaling=self.SCALING)
@@ -89,6 +93,10 @@ class GauzeRetrieveFullDof(PsmEnv):
                             (0, 0, 0, 1),
                             useFixedBase=False,
                             globalScaling=self.SCALING)
+        # print('gauze position:',workspace_limits[0].mean() + (np.random.rand() - 0.5) * 0.1,  # TODO: scaling
+        #                      workspace_limits[1].mean() + (np.random.rand() - 0.5) * 0.1,
+        #                      workspace_limits[2][0] + 0.01)
+        
         p.changeVisualShape(obj_id, -1, specularColor=(0, 0, 0))
         self.obj_ids['rigid'].append(obj_id)  # 0
         self.obj_id, self.obj_link1 = self.obj_ids['rigid'][0], -1
@@ -101,7 +109,7 @@ class GauzeRetrieveFullDof(PsmEnv):
 
 
         psm_pose = self.psm1.get_current_position()
-        print(f"PSM pose RCM: {psm_pose}")
+        # print(f"PSM pose RCM: {psm_pose}")
         psm_pose_ori = psm_pose.copy()
 
         # psm_measured_cp = np.matmul(np.linalg.inv(ecm_pose), psm_pose_ori)#over ecm's rcm
@@ -114,14 +122,14 @@ class GauzeRetrieveFullDof(PsmEnv):
 
         # psm_measured_cp = np.matmul(mapping_mat,psm_measured_cp)
         for i in range(3):
-            print(f"previous goal:{goal.M}")
+            # print(f"previous goal:{goal.M}")
             for j in range(3):
                 goal.M[i,j]=psm_measured_cp[i][j]
                 # if j==1:
                 #     goal.M[i,j]*=-1
                 # goal.M[i,j]=psm_pose[i][j]
-            print(f"modified goal:{goal.M}")
-        print(goal.M.GetEulerZYX())
+            # print(f"modified goal:{goal.M}")
+        # print(goal.M.GetEulerZYX())
         # print(rotationMatrixToEulerAngles(psm_measured_cp[:3,:3]))
         self.m.move_cp(goal).wait() #align
     # def _set_action(self, action: np.ndarray):
@@ -136,6 +144,8 @@ class GauzeRetrieveFullDof(PsmEnv):
         goal = np.array([workspace_limits[0].mean() + 0.02 * np.random.randn() * self.SCALING,
                          workspace_limits[1].mean() + 0.02 * np.random.randn() * self.SCALING,
                          workspace_limits[2][1] - 0.03 * self.SCALING])
+        # goal = np.array([2.78408957,  0.05925255,  3.59641933])
+        print(goal)
         return goal.copy()
 
     def _sample_goal_callback(self):

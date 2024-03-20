@@ -1,0 +1,7 @@
+the overall distance is: 0.0
+the overall distance is: 0.0
+the overall distance is: 0.0010553868015898689
+the overall distance is: 0.0015183913094765004
+the overall distance is: 0.0026497332756802087
+the overall distance is: 0.003800481714485259
+the overall distance is: 0.005109313979393919

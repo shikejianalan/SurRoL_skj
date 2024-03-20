@@ -138,6 +138,7 @@ class PegTransferRL(PsmEnv):
         goals=[1,2,4,4,5]
         np.random.shuffle(goals) 
         goal_id = goals[1]
+        # goal_id = 1
         #correspond to peg id 8 and 10
         if self.red_pegs[0]==8 and (goal_id==4 or goal_id == 2) :
             wl=[5,1]

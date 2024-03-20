@@ -60,5 +60,5 @@ def get_intrinsic_matrix(width, height, fov):
     cx, cy = width / 2., height / 2.
     mat = np.array([[fx, 0, cx],
                     [0, fy, cy],
-                    [0, 0, 1]]).astype(np.float)
+                    [0, 0, 1]]).astype(np.float32)
     return mat

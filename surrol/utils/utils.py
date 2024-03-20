@@ -182,7 +182,7 @@ def get_centroid(mask: np.ndarray, target: int) -> Tuple[bool, np.ndarray]:
     Get the centroid of the target
     :return: True with normalized centroids [-1, 1] if target in the mask picture else False
     """
-    target_mask = (mask == target).astype(np.float)
+    target_mask = (mask == target).astype(np.float32)
     img_shape = mask.shape[:2]
     if np.sum(target_mask > 0):
         M = cv2.moments(target_mask)

@@ -39,6 +39,7 @@ class ActiveTrack(EcmEnv):
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=(0.27, -0.2, 0.55),
             distance=2.3,
+            # distance=10.3,
             yaw=150,
             pitch=-30,
             roll=0,
@@ -124,7 +125,7 @@ class ActiveTrack(EcmEnv):
             print(" -> Out of view! {}".format(np.round(centroids, 4)))
 
         observation = np.concatenate([
-            robot_state, np.array(in_view).astype(np.float).ravel(),
+            robot_state, np.array(in_view).astype(np.float32).ravel(),
             centroids.ravel(), np.array(self.ecm.wz).ravel()  # achieved_goal.copy(),
         ])
         return observation

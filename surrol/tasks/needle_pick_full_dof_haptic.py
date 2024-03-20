@@ -36,7 +36,7 @@ class NeedlePickFullDof_haptic(PsmEnv):
     haptic=True
 
     # TODO: grasp is sometimes not stable; check how to fix it
-    def __init__(self, render_mode=None, cid = -1):
+    def __init__(self, render_mode=None, cid = -1, random_seed=1024):
         super(NeedlePickFullDof_haptic, self).__init__(render_mode, cid)
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=(-0.05 * self.SCALING, 0, 0.375 * self.SCALING),
@@ -46,11 +46,12 @@ class NeedlePickFullDof_haptic(PsmEnv):
             roll=0,
             upAxisIndex=2
         )
+        self.random_seed = random_seed
 
 
     def _env_setup(self):
         super(NeedlePickFullDof_haptic, self)._env_setup()
-        np.random.seed(1024)  # for experiment reproduce
+        np.random.seed(self.random_seed)  # for experiment reproduce
         self.has_object = True
         self._waypoint_goal = True
  

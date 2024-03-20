@@ -71,7 +71,7 @@ class PsmEnv(SurRoLGoalEnv):
         super(PsmEnv, self).__init__(render_mode, cid)
 
         # distance_threshold
-        self.distance_threshold = self.DISTANCE_THRESHOLD * self.SCALING
+        self.distance_threshold = 0.025#self.DISTANCE_THRESHOLD * self.SCALING
 
         # render related setting
         self._view_matrix = p.computeViewMatrixFromYawPitchRoll(
@@ -255,6 +255,11 @@ class PsmEnv(SurRoLGoalEnv):
         """ Indicates whether or not the achieved goal successfully achieved the desired goal.
         """
         d = goal_distance(achieved_goal, desired_goal)
+        if (d < self.distance_threshold).astype(np.float32):
+            print('Achived goal is: ', achieved_goal,'\n')
+            print('Desiredgoal is:, ',  desired_goal, '\n')
+            print('Distance is: ',d, '\n')
+            print('Threshold is: ', self.distance_threshold, '\n')
         return (d < self.distance_threshold).astype(np.float32)
 
     def _step_callback(self):

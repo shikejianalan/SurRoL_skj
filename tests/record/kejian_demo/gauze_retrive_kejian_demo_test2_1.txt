@@ -1,0 +1,16 @@
+the overall distance is: 0.0
+the overall distance is: 0.0
+the overall distance is: 2.0407519716496437e-06
+the overall distance is: 0.003939578794632588
+the overall distance is: 0.00483054843110083
+the overall distance is: 0.0054145775314291735
+the overall distance is: 0.0060647971738821485
+the overall distance is: 0.006539738716475696
+the overall distance is: 0.00701588333297023
+the overall distance is: 0.007362156012777122
+the overall distance is: 0.007926191784629036
+the overall distance is: 0.009073269538049204
+the overall distance is: 0.010113745537484791
+the overall distance is: 0.010602518292980444
+the overall distance is: 0.011004741902014933
+the overall distance is: 0.011350169461793657
